@@ -1,0 +1,42 @@
+services:
+  xray2wg:
+    image: xray2wg:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun
+    # Docker applies these into the container netns (needed when /proc/sys is read-only inside).
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
+      # tun-wg* inherits default; strict rp_filter drops tproxy replies with original remote src IP.
+      - net.ipv4.conf.default.rp_filter=0
+      - net.ipv4.conf.all.rp_filter=0
+      - net.ipv4.conf.default.accept_local=1
+      - net.ipv4.conf.all.accept_local=1
+    ports:
+      - "8080:8080"
+      - "51820-51830:51820-51830/udp"
+    volumes:
+      - ./data:/data
+    environment:
+      - DATA_DIR=/data
+      # Required: exact browser origins for CORS + WebSocket (see README.md).
+      - CORS_ALLOWED_ORIGINS=https://localhost:8080
+      # Plain HTTP on PORT (set false only if clients trust auto-generated TLS on same port).
+      - TLS_OFF=false
+      - TLS_AUTO_CERT=true
+      - BEHIND_HTTPS=false
+      # Optional: WireGuard peer exports use this when Settings → server host is empty (before LAN auto-detect).
+      - PUBLIC_HOST=192.168.1.110
+      - PORT=8080
+      - LOG_LEVEL=debug
+      # Verbose tunnel pipeline + xray-core (grep logs for "tunnel_trace"). Set XRAY_LOG_LEVEL=warning and unset XRAY2WG_TUNNEL_TRACE when stable.
+      - XRAY_LOG_LEVEL=debug
+      - XRAY2WG_TUNNEL_TRACE=1
+      - METRICS_API_KEY=""

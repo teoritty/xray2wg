@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    sans-serif;
+  color: #e2e8f0;
+}
+
+code,
+.font-mono {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}

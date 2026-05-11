@@ -1,0 +1,20 @@
+# Do not overwrite Linux node_modules after `npm ci` (Windows hosts → vite: Permission denied).
+frontend/node_modules
+frontend/dist
+
+# Frontend cache / tooling
+frontend/.vite
+frontend/coverage
+
+# Git and local data volume (never needed inside build context)
+.git
+.gitignore
+**/.DS_Store
+data/*.db
+data/*.key
+data/*.pem
+
+# IDE / OS noise
+.idea
+.vscode
+Thumbs.db

@@ -1,0 +1,45 @@
+# ── Frontend ──────────────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/*.local
+
+# ── Backend / Go ──────────────────────────────────────────────────────────────
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+/backend/vendor/
+
+# Built binaries
+/xray2wg
+/xray2wg.exe
+/xray2wg-linux
+/xray2wg-darwin
+/xray2wg-windows.exe
+
+# ── Runtime data / secrets (never commit) ─────────────────────────────────────
+/data/*.db
+/data/master.key
+/data/jwt_private.pem
+/data/tls/
+.env
+.env.*
+!.env.example
+/scripts
+
+# ── Internal planning docs ─────────────────────────────────────────────────────
+PLAN.md
+docs/Production-Hardening-Plan-v1.0.md
+
+# ── OS / IDE ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
