@@ -97,6 +97,109 @@ func TestBuildXrayConfigDNSInboundWhenGatewaySet(t *testing.T) {
 	}
 }
 
+func TestBuildXrayConfigMuxEnabledWhenNoFlow(t *testing.T) {
+	n := &domain.VlessNode{
+		UUID:      "550e8400-e29b-41d4-a716-446655440000",
+		Address:   "vpn.example.com",
+		Port:      443,
+		Network:   "tcp",
+		Security:  "reality",
+		SNI:       "vpn.example.com",
+		PublicKey: "pbk",
+		ShortID:   "a1",
+	}
+	raw, err := BuildXrayConfig(13001, 0x1001, "", []*domain.VlessNode{n}, domain.BalancingRoundRobin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	for _, ob := range doc.Outbounds {
+		if ob["protocol"] != "vless" {
+			continue
+		}
+		mux, ok := ob["mux"].(map[string]any)
+		if !ok {
+			t.Fatal("mux field missing on VLESS outbound with no flow")
+		}
+		if mux["enabled"] != true {
+			t.Fatalf("mux.enabled: want true, got %v", mux["enabled"])
+		}
+		return
+	}
+	t.Fatal("no vless outbound found")
+}
+
+func TestBuildXrayConfigMuxDisabledWhenFlowSet(t *testing.T) {
+	n := &domain.VlessNode{
+		UUID:        "550e8400-e29b-41d4-a716-446655440000",
+		Address:     "vpn.example.com",
+		Port:        443,
+		Flow:        "xtls-rprx-vision",
+		Network:     "tcp",
+		Security:    "reality",
+		SNI:         "vpn.example.com",
+		PublicKey:   "pbk",
+		ShortID:     "a1",
+		Fingerprint: "chrome",
+	}
+	raw, err := BuildXrayConfig(13001, 0x1001, "", []*domain.VlessNode{n}, domain.BalancingRoundRobin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	for _, ob := range doc.Outbounds {
+		if ob["protocol"] != "vless" {
+			continue
+		}
+		if _, ok := ob["mux"]; ok {
+			t.Fatal("mux must not be set on VLESS outbound with xtls-rprx-vision flow")
+		}
+		return
+	}
+	t.Fatal("no vless outbound found")
+}
+
+func TestBuildXrayConfigMuxMultiNodeMixedFlow(t *testing.T) {
+	nodes := []*domain.VlessNode{
+		{UUID: "aaa", Address: "a.example.com", Port: 443, Network: "tcp", Security: "reality", SNI: "a.example.com", PublicKey: "p", ShortID: "s"},
+		{UUID: "bbb", Address: "b.example.com", Port: 443, Flow: "xtls-rprx-vision", Network: "tcp", Security: "reality", SNI: "b.example.com", PublicKey: "p", ShortID: "s"},
+	}
+	raw, err := BuildXrayConfig(13001, 0x1001, "", nodes, domain.BalancingRoundRobin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	hasMux, noMux := 0, 0
+	for _, ob := range doc.Outbounds {
+		if ob["protocol"] != "vless" {
+			continue
+		}
+		if _, ok := ob["mux"]; ok {
+			hasMux++
+		} else {
+			noMux++
+		}
+	}
+	if hasMux != 1 || noMux != 1 {
+		t.Fatalf("expected 1 outbound with mux and 1 without, got hasMux=%d noMux=%d", hasMux, noMux)
+	}
+}
+
 func TestBuildXrayConfigTransparentInboundDoesNotSetSocketMark(t *testing.T) {
 	n := &domain.VlessNode{
 		UUID:      "550e8400-e29b-41d4-a716-446655440000",

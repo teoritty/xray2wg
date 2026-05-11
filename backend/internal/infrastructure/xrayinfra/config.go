@@ -100,22 +100,26 @@ func buildSingleNodeConfig(node *domain.VlessNode, routeInboundTags []string) (o
 	if f := strings.TrimSpace(node.Flow); f != "" {
 		userObj["flow"] = f
 	}
-	outbounds = []any{
-		map[string]any{"protocol": "freedom", "tag": "direct"},
-		map[string]any{
-			"protocol": "vless",
-			"tag":      "proxy",
-			"settings": map[string]any{
-				"vnext": []any{
-					map[string]any{
-						"address": node.Address,
-						"port":    node.Port,
-						"users":   []any{userObj},
-					},
+	vlessOut := map[string]any{
+		"protocol": "vless",
+		"tag":      "proxy",
+		"settings": map[string]any{
+			"vnext": []any{
+				map[string]any{
+					"address": node.Address,
+					"port":    node.Port,
+					"users":   []any{userObj},
 				},
 			},
-			"streamSettings": streamSettingsOutbound(node, fp, spider),
 		},
+		"streamSettings": streamSettingsOutbound(node, fp, spider),
+	}
+	if strings.TrimSpace(node.Flow) == "" {
+		vlessOut["mux"] = map[string]any{"enabled": true, "concurrency": 8}
+	}
+	outbounds = []any{
+		map[string]any{"protocol": "freedom", "tag": "direct"},
+		vlessOut,
 	}
 	routing = map[string]any{
 		"domainStrategy": "AsIs",
@@ -147,7 +151,7 @@ func buildMultiNodeConfig(nodes []*domain.VlessNode, strategy domain.BalancingSt
 			userObj["flow"] = f
 		}
 		tag := fmt.Sprintf("vless-out-%d", i+1)
-		outbounds = append(outbounds, map[string]any{
+		outEntry := map[string]any{
 			"protocol": "vless",
 			"tag":      tag,
 			"settings": map[string]any{
@@ -160,7 +164,11 @@ func buildMultiNodeConfig(nodes []*domain.VlessNode, strategy domain.BalancingSt
 				},
 			},
 			"streamSettings": streamSettingsOutbound(node, fp, spider),
-		})
+		}
+		if strings.TrimSpace(node.Flow) == "" {
+			outEntry["mux"] = map[string]any{"enabled": true, "concurrency": 8}
+		}
+		outbounds = append(outbounds, outEntry)
 	}
 
 	strategyType := "roundRobin"
