@@ -330,3 +330,31 @@ export const authApi = {
 export const summaryApi = {
   get: (opts: FetchOpts = {}) => apiJson<SummaryResponse>("/stats/summary", opts),
 };
+
+export type AuditLogEntry = {
+  ID: number;
+  Level: string;
+  Source: string;
+  Message: string;
+  CreatedAt: string;
+};
+
+export type AuditLogResponse = {
+  items: AuditLogEntry[];
+  total: number;
+};
+
+export const auditApi = {
+  list: (
+    params: { level?: string; search?: string; limit?: number; offset?: number },
+    opts: FetchOpts = {}
+  ) => {
+    const q = new URLSearchParams();
+    if (params.level) q.set("level", params.level);
+    if (params.search) q.set("search", params.search);
+    if (params.limit != null) q.set("limit", String(params.limit));
+    if (params.offset != null) q.set("offset", String(params.offset));
+    const qs = q.toString();
+    return apiJson<AuditLogResponse>(`/audit${qs ? "?" + qs : ""}`, opts);
+  },
+};

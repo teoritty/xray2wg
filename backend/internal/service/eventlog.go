@@ -11,10 +11,16 @@ type EventEntry struct {
 	Message string    `json:"message"`
 }
 
+// AuditPersister is implemented by the DB audit log repo.
+type AuditPersister interface {
+	Save(level, source, msg string) error
+}
+
 type EventLog struct {
 	mu     sync.Mutex
 	max    int
 	events []EventEntry
+	db     AuditPersister
 }
 
 func NewEventLog(max int) *EventLog {
@@ -24,12 +30,28 @@ func NewEventLog(max int) *EventLog {
 	return &EventLog{max: max}
 }
 
-func (e *EventLog) Add(level, msg string) {
+// SetPersister attaches a DB backend; called once after DB init.
+func (e *EventLog) SetPersister(p AuditPersister) {
 	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.db = p
+	e.mu.Unlock()
+}
+
+func (e *EventLog) Add(level, msg string) {
+	e.AddSource(level, "system", msg)
+}
+
+func (e *EventLog) AddSource(level, source, msg string) {
+	e.mu.Lock()
 	e.events = append(e.events, EventEntry{TS: time.Now().UTC(), Level: level, Message: msg})
 	if len(e.events) > e.max {
 		e.events = e.events[len(e.events)-e.max:]
+	}
+	p := e.db
+	e.mu.Unlock()
+
+	if p != nil && (level == "warn" || level == "error") {
+		_ = p.Save(level, source, msg)
 	}
 }
 

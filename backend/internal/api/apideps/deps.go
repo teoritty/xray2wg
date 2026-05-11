@@ -4,6 +4,7 @@ import (
 	"io/fs"
 
 	"xray2wg/backend/internal/domain"
+	sqldb "xray2wg/backend/internal/infrastructure/db"
 	"xray2wg/backend/internal/service"
 	wshub "xray2wg/backend/internal/ws"
 
@@ -29,6 +30,7 @@ type Deps struct {
 	PeerRepo    domain.PeerRepository
 	Set         domain.SettingRepository
 	EventLog    *service.EventLog
+	AuditDB     *sqldb.AuditLogRepo
 	Hub         *wshub.Hub
 	ManualSubID int64
 	Static      fs.FS

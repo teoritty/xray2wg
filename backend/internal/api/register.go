@@ -54,6 +54,7 @@ func Register(e *echo.Echo, d *Deps) error {
 	mount.MountPeers(apiG, d)
 	mount.MountTunnels(apiG, d)
 	mount.MountWebSocket(auth, d, originCfg)
+	mount.MountAudit(apiG, d)
 
 	if d.Static != nil {
 		e.StaticFS("/", d.Static)

@@ -125,7 +125,9 @@ func main() {
 	peerRepo := sqldb.NewPeerRepo(conn)
 	statsRepo := sqldb.NewStatsRepo(conn)
 
+	auditRepo := sqldb.NewAuditLogRepo(conn)
 	el := service.NewEventLog(128)
+	el.SetPersister(auditRepo)
 	authSvc, err := service.NewAuthService(setRepo, filepath.Join(dataDir, "jwt_private.pem"), el, rootCtx)
 	if err != nil {
 		log.Fatal().Err(err).Msg("jwt")
@@ -178,6 +180,7 @@ func main() {
 		PeerRepo:    peerRepo,
 		Set:         setRepo,
 		EventLog:    el,
+		AuditDB:     auditRepo,
 		Hub:         hub,
 		ManualSubID: manualID,
 		Static:      staticfs.Assets,

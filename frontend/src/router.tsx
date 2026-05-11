@@ -13,6 +13,7 @@ import { PeerConfigPage } from "./pages/peers/PeerConfig";
 import { PeerListPage } from "./pages/peers/PeerListPage";
 import { StatisticsPage } from "./pages/Statistics";
 import { SettingsPage } from "./pages/Settings";
+import { AuditLogPage } from "./pages/AuditLog";
 
 export function App() {
   return (
@@ -37,6 +38,7 @@ export function App() {
           <Route path="tunnels/:tid/peers/:pid/config" element={<PeerConfigPage />} />
           <Route path="tunnels/:id" element={<TunnelDetailPage />} />
           <Route path="statistics" element={<StatisticsPage />} />
+          <Route path="audit" element={<AuditLogPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

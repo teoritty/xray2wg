@@ -125,9 +125,19 @@ type StatsSnapshotRow struct {
 
 func (StatsSnapshotRow) TableName() string { return "stats_snapshots" }
 
+type AuditLogRow struct {
+	ID        int64     `gorm:"primaryKey;autoIncrement"`
+	Level     string    `gorm:"not null;index"`
+	Source    string    `gorm:"not null;default:'system'"`
+	Message   string    `gorm:"not null"`
+	CreatedAt time.Time `gorm:"not null;autoCreateTime;index"`
+}
+
+func (AuditLogRow) TableName() string { return "audit_logs" }
+
 func AutoMigrate(conn *gorm.DB) error {
 	if err := conn.AutoMigrate(&Setting{}, &SubscriptionRow{}, &VlessNodeRow{},
-		&WgInterfaceRow{}, &WgPeerRow{}, &StatsSnapshotRow{}, &TunnelNodeRow{}); err != nil {
+		&WgInterfaceRow{}, &WgPeerRow{}, &StatsSnapshotRow{}, &TunnelNodeRow{}, &AuditLogRow{}); err != nil {
 		return err
 	}
 	// Backfill: existing single-node tunnels → junction table.

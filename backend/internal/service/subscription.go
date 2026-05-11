@@ -127,8 +127,11 @@ func (s *SubscriptionService) FetchAndUpdate(ctx context.Context, id int64) erro
 	req.Header.Set("User-Agent", UA)
 	resp, err := s.client.Do(req)
 	if err != nil {
-		sub.Status = domain.SubStatusError
 		sub.ErrorMessage = err.Error()
+		if sub.NodeCount == 0 {
+			sub.Status = domain.SubStatusError
+		}
+		s.log.Add("warn", fmt.Sprintf("subscription %q fetch failed: %s", sub.Name, err.Error()))
 		_ = s.repo.Update(ctx, sub)
 		return err
 	}
@@ -139,8 +142,11 @@ func (s *SubscriptionService) FetchAndUpdate(ctx context.Context, id int64) erro
 	}
 	lines, err := decodeSubscriptionBody(body)
 	if err != nil {
-		sub.Status = domain.SubStatusError
 		sub.ErrorMessage = err.Error()
+		if sub.NodeCount == 0 {
+			sub.Status = domain.SubStatusError
+		}
+		s.log.Add("warn", fmt.Sprintf("subscription %q decode failed: %s", sub.Name, err.Error()))
 		_ = s.repo.Update(ctx, sub)
 		return err
 	}

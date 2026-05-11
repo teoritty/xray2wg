@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { IconChart, IconCog, IconGrid, IconLink, IconLogout, IconShield, IconUsers } from "../../assets/icons";
+import { IconChart, IconClipboard, IconCog, IconGrid, IconLink, IconLogout, IconShield, IconUsers } from "../../assets/icons";
 
 const link =
   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#94a3b8] transition hover:bg-[#1e1e2e] hover:text-[#e2e8f0]";
@@ -31,6 +31,9 @@ export function Sidebar({
         </NavLink>
         <NavLink to="/statistics" className={({ isActive }) => `${link} ${isActive ? active : ""}`}>
           <IconChart className="h-5 w-5" /> Statistics
+        </NavLink>
+        <NavLink to="/audit" className={({ isActive }) => `${link} ${isActive ? active : ""}`}>
+          <IconClipboard className="h-5 w-5" /> Audit Log
         </NavLink>
       </nav>
       <div className="mt-auto flex flex-col gap-1 border-t border-[#2a2a3f] pt-4">
