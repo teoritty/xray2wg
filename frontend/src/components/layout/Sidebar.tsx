@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { IconChart, IconClipboard, IconCog, IconGrid, IconLink, IconLogout, IconShield, IconUsers } from "../../assets/icons";
+import logo from "../../assets/logo.png";
 
 const link =
   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#94a3b8] transition hover:bg-[#1e1e2e] hover:text-[#e2e8f0]";
@@ -12,9 +13,9 @@ export function Sidebar({
 }) {
   return (
     <aside className="fixed left-0 top-0 z-30 flex h-full w-[240px] flex-col border-r border-[#2a2a3f] bg-[#161620] px-3 py-5">
-      <div className="mb-8 flex items-center gap-2 px-2 font-semibold text-[#e2e8f0]">
-        <IconShield className="h-7 w-7 text-[#6366f1]" />
-        <span>xray2wg</span>
+      <div className="mb-8 flex items-center gap-2.5 px-2">
+        <img src={logo} alt="xray2wg" className="h-10 w-10 rounded-lg object-cover" />
+        <span className="font-semibold text-[#e2e8f0]">xray2wg</span>
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         <NavLink to="/" end className={({ isActive }) => `${link} ${isActive ? active : ""}`}>
