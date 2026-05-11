@@ -317,4 +317,4 @@ Please keep PRs focused. For large features, open an issue first to discuss the 
 
 ## License
 
-[MIT](LICENSE) — © 2025 xray2wg contributors
+[MIT](LICENSE) — © 2026 xray2wg contributors
