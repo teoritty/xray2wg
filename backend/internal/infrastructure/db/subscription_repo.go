@@ -132,6 +132,12 @@ func (r *SubscriptionRepo) DeleteNodes(ctx context.Context, subscriptionID int64
 		`, subscriptionID).Error; err != nil {
 			return err
 		}
+		if err := tx.Exec(`
+			DELETE FROM tunnel_nodes
+			WHERE node_id IN (SELECT id FROM vless_nodes WHERE subscription_id = ?)
+		`, subscriptionID).Error; err != nil {
+			return err
+		}
 		return tx.Where("subscription_id = ?", subscriptionID).Delete(&VlessNodeRow{}).Error
 	})
 }
