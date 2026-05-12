@@ -39,4 +39,11 @@ services:
       # Verbose tunnel pipeline + xray-core (grep logs for "tunnel_trace"). Set XRAY_LOG_LEVEL=warning and unset XRAY2WG_TUNNEL_TRACE when stable.
       - XRAY_LOG_LEVEL=debug
       - XRAY2WG_TUNNEL_TRACE=1
+      # Optional: provide your own TLS certificate (skips auto-generation).
+      # - TLS_CERT_FILE=/data/tls/cert.pem
+      # - TLS_KEY_FILE=/data/tls/key.pem
+      # Optional: bind address for HTTP→HTTPS redirect (e.g. :80).
+      # - HTTP_REDIRECT_ADDR=:80
+      # Optional: protect /metrics with a shared secret header (X-Metrics-Key).
+      # - METRICS_API_KEY=your-secret-key
       - METRICS_API_KEY=""

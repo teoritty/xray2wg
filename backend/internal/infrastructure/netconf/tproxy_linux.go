@@ -65,6 +65,14 @@ func SetupTProxy(tunnelID int, tunName string, xrayPort int, fwmark int, localGa
 			return err
 		}
 	}
+	// ICMP cannot be proxied via TPROXY/xray-core; let it pass through so ping and Path MTU Discovery work.
+	// The existing MASQUERADE rule in nat_linux.go SNATs it out via the host's default interface.
+	icmp := []string{"-p", "icmp", "-j", "RETURN"}
+	log.Info().Str("chain", chain).Strs("rule_icmp", icmp).Msg("tunnel_trace tproxy: append ICMP RETURN (bypass TPROXY)")
+	if err := tb.Append(tableMangle, chain, icmp...); err != nil {
+		log.Error().Err(err).Msg("tunnel_trace tproxy: append ICMP RETURN failed")
+		return err
+	}
 	// Shrink TCP MSS before TPROXY so WG+VLESS path does not black-hole large TLS segments.
 	mss := []string{"-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", "1360"}
 	tcp := []string{"-p", "tcp", "-j", "TPROXY", "--on-port", port, "--tproxy-mark", mark}

@@ -307,11 +307,7 @@ xray2wg/
 
 ## Contributing
 
-1. Fork the repository and create a feature branch
-2. Make your changes — run `go test ./...` and `npm run build` before submitting
-3. Open a pull request with a clear description of what changes and why
-
-Please keep PRs focused. For large features, open an issue first to discuss the approach.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide, including development setup, commit style, and the pull request process.
 
 ---
 
