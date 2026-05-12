@@ -38,6 +38,9 @@ services:
       - LOG_LEVEL=debug
       # Verbose tunnel pipeline + xray-core (grep logs for "tunnel_trace"). Set XRAY_LOG_LEVEL=warning and unset XRAY2WG_TUNNEL_TRACE when stable.
       - XRAY_LOG_LEVEL=debug
+      # Set to "none" to suppress per-connection access log flood ("accepted tcp:... [transparent-in -> proxy]").
+      # Remove or leave empty to keep access logs on stdout (useful for debugging).
+      - XRAY_ACCESS_LOG=none
       - XRAY2WG_TUNNEL_TRACE=1
       # Optional: provide your own TLS certificate (skips auto-generation).
       # - TLS_CERT_FILE=/data/tls/cert.pem

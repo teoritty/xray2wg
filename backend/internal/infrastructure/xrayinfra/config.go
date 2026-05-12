@@ -37,8 +37,12 @@ func BuildXrayConfig(xrayListenPort int, fwmark int, localGatewayIP string, node
 		outbounds, routing, observatoryDoc = buildMultiNodeConfig(nodes, strategy, routeInboundTags)
 	}
 
+	logDoc := map[string]any{"logLevel": tracenv.XrayLogLevel()}
+	if v := tracenv.XrayAccessLog(); v != "" {
+		logDoc["access"] = v
+	}
 	doc := map[string]any{
-		"log":       map[string]any{"logLevel": tracenv.XrayLogLevel()},
+		"log":       logDoc,
 		"inbounds":  inbounds,
 		"outbounds": outbounds,
 		"routing":   routing,

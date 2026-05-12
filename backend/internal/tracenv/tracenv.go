@@ -20,3 +20,10 @@ func XrayLogLevel() string {
 	}
 	return v
 }
+
+// XrayAccessLog returns the value for xray-core JSON log.access.
+// Empty string means stdout (xray-core default); "none" disables access logs entirely.
+// Controlled by XRAY_ACCESS_LOG env var.
+func XrayAccessLog() string {
+	return strings.TrimSpace(os.Getenv("XRAY_ACCESS_LOG"))
+}
