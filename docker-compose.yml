@@ -26,27 +26,34 @@ services:
       - ./data:/data
     environment:
       - DATA_DIR=/data
+      
       # Required: exact browser origins for CORS + WebSocket (see README.md).
       - CORS_ALLOWED_ORIGINS=https://localhost:8080
+      
       # Plain HTTP on PORT (set false only if clients trust auto-generated TLS on same port).
       - TLS_OFF=false
       - TLS_AUTO_CERT=true
       - BEHIND_HTTPS=false
+
       # Optional: WireGuard peer exports use this when Settings → server host is empty (before LAN auto-detect).
       - PUBLIC_HOST=192.168.1.110
       - PORT=8080
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=warning
+
       # Verbose tunnel pipeline + xray-core (grep logs for "tunnel_trace"). Set XRAY_LOG_LEVEL=warning and unset XRAY2WG_TUNNEL_TRACE when stable.
-      - XRAY_LOG_LEVEL=debug
+      - XRAY_LOG_LEVEL=warning
+
       # Set to "none" to suppress per-connection access log flood ("accepted tcp:... [transparent-in -> proxy]").
       # Remove or leave empty to keep access logs on stdout (useful for debugging).
       - XRAY_ACCESS_LOG=none
-      - XRAY2WG_TUNNEL_TRACE=1
+      - XRAY2WG_TUNNEL_TRACE=0
+
       # Optional: provide your own TLS certificate (skips auto-generation).
       # - TLS_CERT_FILE=/data/tls/cert.pem
       # - TLS_KEY_FILE=/data/tls/key.pem
+
       # Optional: bind address for HTTP→HTTPS redirect (e.g. :80).
       # - HTTP_REDIRECT_ADDR=:80
+
       # Optional: protect /metrics with a shared secret header (X-Metrics-Key).
       # - METRICS_API_KEY=your-secret-key
-      - METRICS_API_KEY=""
