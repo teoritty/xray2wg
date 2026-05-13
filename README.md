@@ -13,24 +13,9 @@
 
 Most consumer routers (MikroTik, Keenetic) support WireGuard natively but cannot speak the VLESS protocol. xray2wg runs as a Docker container and acts as a transparent bridge:
 
-```
-┌─────────────────────────────────────────────────────┐
-│   Your Router (MikroTik / OpenWrt / any WG client)  │
-└────────────────────┬────────────────────────────────┘
-                     │ WireGuard (UDP, encrypted)
-                     ▼
-┌─────────────────────────────────────────────────────┐
-│   xray2wg container                                 │
-│                                                     │
-│   wireguard-go ──► iptables TPROXY ──► xray-core   │
-│   (userspace WG)                    (VLESS outbound)│
-└────────────────────┬────────────────────────────────┘
-                     │ VLESS+Reality (TCP/TLS, encrypted)
-                     ▼
-┌─────────────────────────────────────────────────────┐
-│   Your VLESS upstream server                        │
-└─────────────────────────────────────────────────────┘
-```
+<p align="center">
+ <img width="1000px" src="assets/scheme.png" alt="Network Scheme"/>
+</p>
 
 Traffic from WG clients is intercepted transparently via `TPROXY` and forwarded through one or more VLESS nodes. The client never needs to know about VLESS at all.
 
@@ -61,7 +46,7 @@ Traffic from WG clients is intercepted transparently via `TPROXY` and forwarded 
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/your-username/xray2wg.git
+git clone https://github.com/teoritty/xray2wg.git
 cd xray2wg
 mkdir -p data
 ```
