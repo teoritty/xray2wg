@@ -17,11 +17,11 @@ export function NodeHealthBadge({ health }: Props) {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs text-red-400">
         <span className="h-2 w-2 rounded-full bg-red-400" />
-        недоступен
+        unavailable
       </span>
     );
   }
-  const label = health.delay_ms > 0 ? `${health.delay_ms} мс` : "ok";
+  const label = health.delay_ms > 0 ? `${health.delay_ms} ms` : "ok";
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400">
       <span className="h-2 w-2 rounded-full bg-emerald-400" />

@@ -186,12 +186,12 @@ export function TunnelFormPage() {
   return (
     <Card className="max-w-2xl space-y-5">
       <div>
-        <Label htmlFor="tun-name">Название</Label>
-        <Input id="tun-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Мой туннель" />
+        <Label htmlFor="tun-name">Name</Label>
+        <Input id="tun-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="My Tunnel" />
       </div>
 
       <div>
-        <Label>Подписка</Label>
+        <Label>Subscription</Label>
         <Select
           value={subId === "" ? "" : String(subId)}
           onChange={(e) => {
@@ -201,16 +201,16 @@ export function TunnelFormPage() {
             setVlessUri("");
           }}
         >
-          <option value="">Выберите подписку…</option>
+          <option value="">Select a subscription…</option>
           {selectableSubs.map((s) => (
             <option key={s.ID} value={String(s.ID)}>
               {s.Name}
             </option>
           ))}
-          {manual ? <option value={String(manual.ID)}>Ручной VLESS URI</option> : null}
+          {manual ? <option value={String(manual.ID)}>Manual VLESS URI</option> : null}
         </Select>
         <p className="mt-1 text-xs text-slate-500">
-          Выберите подписку, чтобы увидеть доступные VLESS-узлы.
+          Select a subscription to see available VLESS nodes.
         </p>
       </div>
 
@@ -218,18 +218,18 @@ export function TunnelFormPage() {
         <div>
           <Label>VLESS URI</Label>
           <Input value={vlessUri} onChange={(e) => setVlessUri(e.target.value)} placeholder="vless://…" />
-          <p className="mt-1 text-xs text-slate-500">Вставьте строку vless:// из вашего провайдера.</p>
+          <p className="mt-1 text-xs text-slate-500">Paste the vless:// string from your ISP.</p>
         </div>
       ) : (
         <div>
           <Label>
-            VLESS-узлы{" "}
+            VLESS-nodes{" "}
             {selectedNodes.length > 0 && (
-              <span className="font-normal text-slate-500">({selectedNodes.length} выбрано)</span>
+              <span className="font-normal text-slate-500">({selectedNodes.length} selected)</span>
             )}
           </Label>
           <p className="mb-2 text-xs text-slate-500">
-            Добавьте один или несколько узлов. При нескольких узлах трафик балансируется между ними.
+            Add one or more nodes. With multiple nodes, traffic is balanced between them.
           </p>
           <NodeSelector
             selectedNodes={selectedNodes}
@@ -241,28 +241,28 @@ export function TunnelFormPage() {
       )}
 
       <div>
-        <Label htmlFor="listen-port">Порт WireGuard (UDP)</Label>
+        <Label htmlFor="listen-port">WireGuard Port (UDP)</Label>
         <Input
           id="listen-port"
           type="number"
           value={listenPort}
           onChange={(e) => setListenPort(e.target.value === "" ? "" : Number(e.target.value))}
-          placeholder="авто (51820+)"
+          placeholder="auto (51820+)"
         />
       </div>
 
       <div>
-        <Label htmlFor="wg-addr">Адрес WG (CIDR)</Label>
+        <Label htmlFor="wg-addr">WG Address (CIDR)</Label>
         <Input
           id="wg-addr"
           value={wgAddress}
           onChange={(e) => setWgAddress(e.target.value)}
-          placeholder="авто (10.100.N.1/24)"
+          placeholder="auto (10.100.N.1/24)"
         />
       </div>
 
       <button type="button" className="text-sm text-indigo-400 hover:underline" onClick={() => setAdv((v) => !v)}>
-        {adv ? "Скрыть" : "Дополнительно"}
+        {adv ? "Hide" : "Advanced"}
       </button>
       {adv && (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -272,7 +272,7 @@ export function TunnelFormPage() {
               id="dns"
               value={dns}
               onChange={(e) => setDns(e.target.value)}
-              placeholder="пусто = шлюз туннеля (рекомендуется)"
+              placeholder="empty = tunnel gateway (recommended)"
             />
           </div>
           <div>
@@ -286,10 +286,10 @@ export function TunnelFormPage() {
 
       <div className="flex gap-2">
         <Button onClick={submit} disabled={!canSubmit || create.isPending || update.isPending}>
-          {isEdit ? "Сохранить" : "Создать"}
+          {isEdit ? "Save" : "Create"}
         </Button>
         <Link to={isEdit ? `/tunnels/${editId}` : "/tunnels"}>
-          <Button variant="secondary">Отмена</Button>
+          <Button variant="secondary">Cancel</Button>
         </Link>
       </div>
     </Card>

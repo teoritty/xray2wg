@@ -21,10 +21,10 @@ type Win = "1h" | "6h" | "24h";
 type Tab = "peers" | "nodes" | "statistics" | "info";
 
 const TAB_LABELS: Record<Tab, string> = {
-  peers: "Пиры",
-  nodes: "Узлы",
-  statistics: "Статистика",
-  info: "Инфо",
+  peers: "Peers",
+  nodes: "Nodes",
+  statistics: "Statisctics",
+  info: "Info",
 };
 
 export function TunnelDetailPage() {
@@ -90,8 +90,8 @@ export function TunnelDetailPage() {
     },
   });
 
-  if (!Number.isFinite(tid)) return <p className="text-red-400">Неверный ID туннеля</p>;
-  if (isLoading || !t) return <p className="text-slate-400">Загрузка…</p>;
+  if (!Number.isFinite(tid)) return <p className="text-red-400">Invalid tunnel ID</p>;
+  if (isLoading || !t) return <p className="text-slate-400">Loading…</p>;
 
   // Build view data for node tab
   const viewNodes: SelectedNode[] = (nodesData?.nodes ?? []).map((n) => ({
@@ -118,7 +118,7 @@ export function TunnelDetailPage() {
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <StatusBadge status={t.Status} />
             {t.UptimeStarted ? (
-              <span className="text-sm text-slate-500">Запущен {formatTime(t.UptimeStarted)}</span>
+              <span className="text-sm text-slate-500">Running {formatTime(t.UptimeStarted)}</span>
             ) : null}
           </div>
           {t.Status === "error" && t.ErrorMessage ? (
@@ -126,30 +126,30 @@ export function TunnelDetailPage() {
           ) : null}
           {allNodesDown && (
             <p className="mt-3 rounded-lg border border-red-500/40 bg-red-950/30 px-4 py-2 text-sm text-red-400">
-              Все VLESS-узлы недоступны. Туннель запущен, но трафик не проходит.
+              All VLESS nodes are unavailable. The tunnel is running, but traffic is failing.
             </p>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
           {t.Status === "running" ? (
             <Button variant="secondary" onClick={() => stop.mutate()} disabled={stop.isPending}>
-              Остановить
+              Stop
             </Button>
           ) : (
             <Button onClick={() => start.mutate()} disabled={start.isPending}>
-              Запустить
+              Start
             </Button>
           )}
           <Link to={`/tunnels/${tid}/edit`}>
-            <Button variant="secondary">Изменить</Button>
+            <Button variant="secondary">Edit</Button>
           </Link>
           <Button
             variant="danger"
             onClick={() => {
-              if (confirm(`Удалить туннель ${t.Name}?`)) remove.mutate();
+              if (confirm(`Remove tunnel ${t.Name}?`)) remove.mutate();
             }}
           >
-            Удалить
+            Delete
           </Button>
         </div>
       </div>
@@ -174,7 +174,7 @@ export function TunnelDetailPage() {
       {tab === "peers" && (
         <div className="space-y-4">
           <Link to={`/tunnels/${tid}/peers/new`}>
-            <Button>Добавить пир</Button>
+            <Button>Add a peer</Button>
           </Link>
           <PeerTable
             showTunnelColumn={false}
@@ -200,18 +200,18 @@ export function TunnelDetailPage() {
                 readOnly
               />
               {viewNodes.length === 0 && (
-                <p className="text-sm text-slate-500">Узлы не назначены.</p>
+                <p className="text-sm text-slate-500">Nodes are assigned.</p>
               )}
             </>
           ) : (
-            <p className="text-sm text-slate-500">Загрузка…</p>
+            <p className="text-sm text-slate-500">Loading…</p>
           )}
           <Link to={`/tunnels/${tid}/edit`}>
-            <Button variant="secondary">Изменить узлы</Button>
+            <Button variant="secondary">Edit nodes</Button>
           </Link>
           {nodesData && nodesData.nodes.length > 0 && t.Status !== "running" && (
             <p className="text-xs text-slate-600">
-              Данные о доступности появятся после запуска туннеля со стратегией «Least Ping».
+              Availability data will appear after the tunnel is launched with the "Least Ping" strategy.
             </p>
           )}
         </div>
@@ -242,30 +242,30 @@ export function TunnelDetailPage() {
       {tab === "info" && (
         <Card className="space-y-3 font-mono text-sm">
           <div>
-            <span className="text-slate-500">Публичный ключ сервера</span>
+            <span className="text-slate-500">Server public key</span>
             <p className="break-all text-slate-200">{t.PublicKey}</p>
           </div>
           <div>
-            <span className="text-slate-500">Адрес WG</span>
+            <span className="text-slate-500">WG address</span>
             <p className="text-slate-200">{t.WgAddress}</p>
           </div>
           <div>
-            <span className="text-slate-500">Порт</span>
+            <span className="text-slate-500">Port</span>
             <p className="text-slate-200">{t.ListenPort}</p>
           </div>
           <div>
-            <span className="text-slate-500">Стратегия балансировки</span>
+            <span className="text-slate-500">Balancing strategy</span>
             <p className="text-slate-200">
               {t.BalancingStrategy === "least_ping" ? "Least Ping" : "Round Robin"}
             </p>
           </div>
           <div>
-            <span className="text-slate-500">Узлов</span>
+            <span className="text-slate-500">Nodes</span>
             <p className="text-slate-200">{nodesData?.nodes.length ?? "—"}</p>
           </div>
           {nodesData && nodesData.nodes.length > 0 && (
             <div>
-              <span className="text-slate-500">Статус узлов</span>
+              <span className="text-slate-500">Node status</span>
               <div className="mt-1 flex flex-wrap gap-2">
                 {nodesData.nodes.map((n) => (
                   <span key={n.id} className="flex items-center gap-1.5 text-xs">
@@ -280,7 +280,7 @@ export function TunnelDetailPage() {
       )}
 
       <Link to="/tunnels" className="text-sm text-indigo-400 hover:underline">
-        ← Все туннели
+        ← All tunnels
       </Link>
     </div>
   );

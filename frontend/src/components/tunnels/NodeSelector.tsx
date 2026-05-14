@@ -27,12 +27,12 @@ const STRATEGY_OPTIONS: { value: "round_robin" | "least_ping"; label: string; hi
   {
     value: "round_robin",
     label: "Round Robin",
-    hint: "Трафик распределяется поровну между узлами. Узлы не проверяются автоматически.",
+    hint: "Traffic is distributed equally among nodes. Nodes are not checked automatically.",
   },
   {
     value: "least_ping",
     label: "Least Ping",
-    hint: "Трафик направляется на самый быстрый узел. Автоматические проверки каждые 10 с.",
+    hint: "Traffic is routed to the fastest node. Automatic checks are performed every 10 seconds.",
   },
 ];
 
@@ -82,7 +82,7 @@ export function NodeSelector({ selectedNodes, availableNodes, strategy, health, 
       <div className="space-y-1.5">
         {selectedNodes.length === 0 && (
           <p className="rounded-lg border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-500">
-            Узлы не выбраны. Добавьте хотя бы один VLESS-узел.
+            No nodes selected. Please add at least one VLESS node.
           </p>
         )}
         {selectedNodes.map((node, i) => (
@@ -111,7 +111,7 @@ export function NodeSelector({ selectedNodes, availableNodes, strategy, health, 
                   type="button"
                   onClick={() => move(i, -1)}
                   disabled={i === 0}
-                  title="Переместить вверх"
+                  title="Move UP"
                   className="rounded p-1 text-slate-500 hover:text-slate-300 disabled:opacity-30"
                 >
                   ▲
@@ -120,7 +120,7 @@ export function NodeSelector({ selectedNodes, availableNodes, strategy, health, 
                   type="button"
                   onClick={() => move(i, 1)}
                   disabled={i === selectedNodes.length - 1}
-                  title="Переместить вниз"
+                  title="MoveDown"
                   className="rounded p-1 text-slate-500 hover:text-slate-300 disabled:opacity-30"
                 >
                   ▼
@@ -128,7 +128,7 @@ export function NodeSelector({ selectedNodes, availableNodes, strategy, health, 
                 <button
                   type="button"
                   onClick={() => remove(node.id)}
-                  title="Удалить"
+                  title="Delete"
                   className="rounded p-1 text-slate-600 hover:text-red-400"
                 >
                   ✕
@@ -147,7 +147,7 @@ export function NodeSelector({ selectedNodes, availableNodes, strategy, health, 
             onClick={() => setShowPicker((v) => !v)}
             className="flex items-center gap-2 rounded-lg border border-dashed border-slate-700 px-4 py-2 text-sm text-slate-400 hover:border-indigo-500 hover:text-indigo-400 transition-colors"
           >
-            <span>+</span> Добавить узел
+            <span>+</span> Add a node
           </button>
 
           {showPicker && (
@@ -156,7 +156,7 @@ export function NodeSelector({ selectedNodes, availableNodes, strategy, health, 
                 <input
                   autoFocus
                   type="text"
-                  placeholder="Поиск по имени или адресу…"
+                  placeholder="Search by name or address…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full rounded bg-slate-800 px-3 py-1.5 text-sm text-slate-200 outline-none"
@@ -165,7 +165,7 @@ export function NodeSelector({ selectedNodes, availableNodes, strategy, health, 
               <div className="max-h-60 overflow-y-auto">
                 {filteredAvailable.length === 0 && (
                   <p className="px-4 py-3 text-sm text-slate-500">
-                    {availableNodes.length === 0 ? "Нет доступных узлов" : "Не найдено"}
+                    {availableNodes.length === 0 ? "No nodes available" : "Not found"}
                   </p>
                 )}
                 {filteredAvailable.map((node) => (
@@ -188,7 +188,7 @@ export function NodeSelector({ selectedNodes, availableNodes, strategy, health, 
                   onClick={() => { setShowPicker(false); setSearch(""); }}
                   className="w-full rounded py-1 text-xs text-slate-500 hover:text-slate-300"
                 >
-                  Закрыть
+                  Close
                 </button>
               </div>
             </div>
@@ -199,7 +199,7 @@ export function NodeSelector({ selectedNodes, availableNodes, strategy, health, 
       {/* Strategy selector */}
       {!readOnly && (
         <div className="space-y-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Стратегия балансировки</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Balancing strategy</p>
           <div className="flex gap-3">
             {STRATEGY_OPTIONS.map((opt) => (
               <label
@@ -231,7 +231,7 @@ export function NodeSelector({ selectedNodes, availableNodes, strategy, health, 
       {/* Strategy display (read-only) */}
       {readOnly && (
         <div className="flex items-center gap-2 text-sm text-slate-400">
-          <span className="font-medium text-slate-300">Стратегия:</span>
+          <span className="font-medium text-slate-300">Strategy:</span>
           {STRATEGY_OPTIONS.find((o) => o.value === strategy)?.label ?? strategy}
         </div>
       )}
