@@ -69,13 +69,14 @@ export function ManualNodesSection({ manualSubId, onAdd }: Props) {
         </Card>
       ) : (
         <Table
-          headers={["Display name", "Address", "Port", "Security", "Flow", "Used by", "Actions"]}
+          headers={["Display name", "Address", "Port", "Transport", "Security", "Flow", "Used by", "Actions"]}
         >
           {nodes.map((n) => (
             <tr key={n.ID} className="border-b border-[#2a2a3f]">
               <td className="px-4 py-3">{n.DisplayName || "—"}</td>
               <td className="px-4 py-3 font-mono text-xs">{n.Address}</td>
               <td className="px-4 py-3">{n.Port}</td>
+              <td className="px-4 py-3">{n.Network}</td>
               <td className="px-4 py-3">{n.Security}</td>
               <td className="px-4 py-3">{n.Flow}</td>
               <td className="px-4 py-3">{using(n)}</td>

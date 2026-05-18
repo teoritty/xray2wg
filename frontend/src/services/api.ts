@@ -224,6 +224,15 @@ export type SummaryResponse = {
   events: SummaryEvent[];
 };
 
+// ManualNodeRequestBody mirrors backend api/mount/subscriptions.go: the POST/PUT endpoint
+// accepts either a vless:// URI ({vless_uri: "vless://..."}) or a structured payload
+// ({manual: {...}}). The frontend chooses one of the two; the backend validates the active
+// branch and refuses the other if the wrong fields are populated.
+import type { ManualNodeBody } from "../types/vless";
+export type ManualNodeRequestBody =
+  | { vless_uri: string; manual?: undefined }
+  | { vless_uri?: undefined; manual: ManualNodeBody };
+
 export const subscriptionsApi = {
   list: (opts: FetchOpts = {}) => apiJson<Subscription[]>("/subscriptions", opts),
   get: (id: number, opts: FetchOpts = {}) => apiJson<Subscription>(`/subscriptions/${id}`, opts),
@@ -234,9 +243,9 @@ export const subscriptionsApi = {
   remove: (id: number, opts: FetchOpts = {}) => apiOk(`/subscriptions/${id}`, { method: "DELETE", ...opts }),
   refresh: (id: number, opts: FetchOpts = {}) => apiOk(`/subscriptions/${id}/refresh`, { method: "POST", ...opts }),
   nodes: (id: number, opts: FetchOpts = {}) => apiJson<VlessNode[]>(`/subscriptions/${id}/nodes`, opts),
-  addManualNode: (body: { vless_uri: string }, opts: FetchOpts = {}) =>
+  addManualNode: (body: ManualNodeRequestBody, opts: FetchOpts = {}) =>
     apiJson<VlessNode>("/subscriptions/manual-nodes", { method: "POST", body: JSON.stringify(body), ...opts }),
-  updateManualNode: (nodeId: number, body: { vless_uri: string }, opts: FetchOpts = {}) =>
+  updateManualNode: (nodeId: number, body: ManualNodeRequestBody, opts: FetchOpts = {}) =>
     apiJson<VlessNode>(`/subscriptions/manual-nodes/${nodeId}`, {
       method: "PUT",
       body: JSON.stringify(body),

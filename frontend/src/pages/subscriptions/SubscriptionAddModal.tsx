@@ -1,11 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { ManualNodeForm, emptyManualNodeBody } from "../../components/nodes/ManualNodeForm";
 import { Button } from "../../components/ui/Button";
 import { Input, Label, Select, TextArea } from "../../components/ui/Form";
 import { Modal } from "../../components/ui/Modal";
 import { ApiException, MANUAL_SUB_NAME, subscriptionsApi } from "../../services/api";
+import type { ManualNodeBody } from "../../types/vless";
 
 export type AddMode = "subscription_url" | "vless_uri";
+
+type VlessSubMode = "uri" | "form";
 
 const intervals = [
   { sec: 3600, label: "1 hour" },
@@ -22,19 +26,23 @@ type Props = {
 export function SubscriptionAddModal({ open, initialMode = "subscription_url", onClose }: Props) {
   const qc = useQueryClient();
   const [mode, setMode] = useState<AddMode>(initialMode);
+  const [vlessSubMode, setVlessSubMode] = useState<VlessSubMode>("uri");
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [ival, setIval] = useState(3600);
   const [vlessUri, setVlessUri] = useState("");
+  const [manualForm, setManualForm] = useState<ManualNodeBody>(emptyManualNodeBody());
   const [savedOnce, setSavedOnce] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setMode(initialMode);
+    setVlessSubMode("uri");
     setName("");
     setUrl("");
     setIval(3600);
     setVlessUri("");
+    setManualForm(emptyManualNodeBody());
     setSavedOnce(false);
   }, [open, initialMode]);
 
@@ -48,11 +56,15 @@ export function SubscriptionAddModal({ open, initialMode = "subscription_url", o
   });
 
   const addManual = useMutation({
-    mutationFn: () => subscriptionsApi.addManualNode({ vless_uri: vlessUri.trim() }),
+    mutationFn: () =>
+      vlessSubMode === "uri"
+        ? subscriptionsApi.addManualNode({ vless_uri: vlessUri.trim() })
+        : subscriptionsApi.addManualNode({ manual: manualForm }),
     onSuccess: (node) => {
       void qc.invalidateQueries({ queryKey: ["subscriptions"] });
       void qc.invalidateQueries({ queryKey: ["nodes", node.SubscriptionID] });
       setVlessUri("");
+      setManualForm(emptyManualNodeBody());
       setSavedOnce(true);
     },
   });
@@ -138,22 +150,46 @@ export function SubscriptionAddModal({ open, initialMode = "subscription_url", o
           </div>
         ) : (
           <div className="space-y-3">
-            <div>
-              <Label htmlFor="vless-paste">VLESS URI</Label>
-              <TextArea
-                id="vless-paste"
-                rows={4}
-                value={vlessUri}
-                onChange={(e) => setVlessUri(e.target.value)}
-                placeholder="vless://uuid@host:443?…#label"
-                spellCheck={false}
-                autoComplete="off"
-              />
+            <div className="flex gap-2" role="tablist">
+              <Button
+                type="button"
+                variant={vlessSubMode === "uri" ? "primary" : "secondary"}
+                className="!px-3 !py-1.5 text-xs"
+                onClick={() => setVlessSubMode("uri")}
+              >
+                Paste URI
+              </Button>
+              <Button
+                type="button"
+                variant={vlessSubMode === "form" ? "primary" : "secondary"}
+                className="!px-3 !py-1.5 text-xs"
+                onClick={() => setVlessSubMode("form")}
+              >
+                Manual edit
+              </Button>
             </div>
-            <p className="text-xs text-[#64748b]">
-              Paste one complete link. It is stored as a manual node (same pool used when creating a tunnel
-              with “Manual VLESS URI”). Duplicate links are rejected.
-            </p>
+
+            {vlessSubMode === "uri" ? (
+              <div>
+                <Label htmlFor="vless-paste">VLESS URI</Label>
+                <TextArea
+                  id="vless-paste"
+                  rows={4}
+                  value={vlessUri}
+                  onChange={(e) => setVlessUri(e.target.value)}
+                  placeholder="vless://uuid@host:443?…#label"
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+                <p className="mt-2 text-xs text-[#64748b]">
+                  Paste one complete link. It is stored as a manual node (same pool used when creating a tunnel
+                  with “Manual VLESS URI”). Duplicate links are rejected.
+                </p>
+              </div>
+            ) : (
+              <ManualNodeForm value={manualForm} onChange={setManualForm} />
+            )}
+
             {vlessError ? <p className="text-sm text-[#ef4444]">{vlessError}</p> : null}
             {savedOnce && !addManual.isPending && !vlessError ? (
               <p className="text-sm text-[#22c55e]">
@@ -167,7 +203,12 @@ export function SubscriptionAddModal({ open, initialMode = "subscription_url", o
               <Button
                 type="button"
                 onClick={() => addManual.mutate()}
-                disabled={!vlessUri.trim() || addManual.isPending}
+                disabled={
+                  addManual.isPending ||
+                  (vlessSubMode === "uri"
+                    ? !vlessUri.trim()
+                    : !manualForm.uuid.trim() || !manualForm.address.trim() || manualForm.port <= 0)
+                }
               >
                 {addManual.isPending ? "Saving…" : "Save VLESS node"}
               </Button>
