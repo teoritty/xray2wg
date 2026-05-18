@@ -1,17 +1,17 @@
 package security
 
 import (
+	"encoding/json"
+	"net/url"
 	"strings"
-
-	"xray2wg/backend/internal/domain"
 )
 
 // TLSSpec captures standard TLS parameters parseable from a vless:// share-link.
 type TLSSpec struct {
-	ServerName    string
-	ALPN          []string
-	Fingerprint   string
-	AllowInsecure bool
+	ServerName    string   `json:"serverName,omitempty"`
+	ALPN          []string `json:"alpn,omitempty"`
+	Fingerprint   string   `json:"fingerprint,omitempty"`
+	AllowInsecure bool     `json:"allowInsecure,omitempty"`
 }
 
 type tlsSecurity struct{}
@@ -21,10 +21,16 @@ func (tlsSecurity) Aliases() []string { return nil }
 
 func (tlsSecurity) ParseURI(ctx ParseCtx) (Spec, error) {
 	q := ctx.Query
+	allow := false
+	switch strings.ToLower(strings.TrimSpace(q.Get("allowInsecure"))) {
+	case "1", "true", "yes":
+		allow = true
+	}
 	return TLSSpec{
-		ServerName:  strings.TrimSpace(q.Get("sni")),
-		ALPN:        splitALPN(q.Get("alpn")),
-		Fingerprint: strings.TrimSpace(q.Get("fp")),
+		ServerName:    strings.TrimSpace(q.Get("sni")),
+		ALPN:          splitALPN(q.Get("alpn")),
+		Fingerprint:   strings.TrimSpace(q.Get("fp")),
+		AllowInsecure: allow,
 	}, nil
 }
 
@@ -45,9 +51,9 @@ func splitALPN(raw string) []string {
 
 func (tlsSecurity) Validate(spec Spec) error { return nil }
 
-// EmitSettings reproduces the historical tlsSettings layout: hard-coded allowInsecure=false
-// (commit 2 will surface AllowInsecure from the Spec) and ALPN as []any so json.Marshal
-// emits a JSON array even when empty.
+// EmitSettings reproduces the tlsSettings layout xray-core expects. ALPN is serialized as
+// []any so json.Marshal emits a JSON array; an empty slice serializes to null which xray
+// accepts.
 func (tlsSecurity) EmitSettings(spec Spec) (map[string]any, error) {
 	s := spec.(TLSSpec)
 	var alpnVals []any
@@ -61,25 +67,36 @@ func (tlsSecurity) EmitSettings(spec Spec) (map[string]any, error) {
 	}, nil
 }
 
-func (tlsSecurity) ApplyToLegacyNode(spec Spec, n *domain.VlessNode) {
-	s := spec.(TLSSpec)
-	if s.ServerName != "" {
-		n.SNI = s.ServerName
-	}
-	if s.Fingerprint != "" {
-		n.Fingerprint = s.Fingerprint
-	}
-	if len(s.ALPN) > 0 {
-		n.ALPN = strings.Join(s.ALPN, ",")
-	}
+func (tlsSecurity) EncodeSpec(spec Spec) (json.RawMessage, error) {
+	return json.Marshal(spec.(TLSSpec))
 }
 
-func (tlsSecurity) SpecFromLegacyNode(n *domain.VlessNode) Spec {
-	return TLSSpec{
-		ServerName:  n.SNI,
-		ALPN:        splitALPN(n.ALPN),
-		Fingerprint: n.Fingerprint,
+func (tlsSecurity) DecodeSpec(data json.RawMessage) (Spec, error) {
+	var s TLSSpec
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &s); err != nil {
+			return nil, err
+		}
 	}
+	return s, nil
+}
+
+func (tlsSecurity) ShareLink(spec Spec) (url.Values, error) {
+	s := spec.(TLSSpec)
+	v := url.Values{}
+	if s.ServerName != "" {
+		v.Set("sni", s.ServerName)
+	}
+	if len(s.ALPN) > 0 {
+		v.Set("alpn", strings.Join(s.ALPN, ","))
+	}
+	if s.Fingerprint != "" {
+		v.Set("fp", s.Fingerprint)
+	}
+	if s.AllowInsecure {
+		v.Set("allowInsecure", "1")
+	}
+	return v, nil
 }
 
 func init() { Default.Register(tlsSecurity{}) }

@@ -4,8 +4,6 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
-
-	"xray2wg/backend/internal/domain"
 )
 
 func TestWS_EmitSettings_defaultPath(t *testing.T) {
@@ -31,18 +29,23 @@ func TestWS_EmitSettings_relativePathFallsBackToSlash(t *testing.T) {
 	}
 }
 
-func TestWS_ApplyToLegacyNode_writesPathToSpiderXAndHostToSNIWhenEmpty(t *testing.T) {
+func TestWS_RoundTrip(t *testing.T) {
 	tr, _ := Default.Resolve("ws")
-	n := &domain.VlessNode{}
-	tr.ApplyToLegacyNode(WSSpec{Path: "/v", Host: "cdn.example"}, n)
-	if n.SpiderX != "/v" || n.SNI != "cdn.example" {
-		t.Fatalf("ApplyToLegacyNode: %+v", n)
+	original := WSSpec{Path: "/v", Host: "cdn.example.com"}
+	data, err := tr.EncodeSpec(original)
+	if err != nil {
+		t.Fatal(err)
 	}
-	// SNI must not be overwritten when already set.
-	n2 := &domain.VlessNode{SNI: "explicit.sni"}
-	tr.ApplyToLegacyNode(WSSpec{Path: "/v", Host: "cdn.example"}, n2)
-	if n2.SNI != "explicit.sni" {
-		t.Fatalf("WS must not overwrite an explicitly set SNI; got %q", n2.SNI)
+	decoded, err := tr.DecodeSpec(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(decoded, original) {
+		t.Fatalf("round-trip: got %+v, want %+v", decoded, original)
+	}
+	share, _ := tr.ShareLink(original)
+	if share.Get("path") != "/v" || share.Get("host") != "cdn.example.com" {
+		t.Fatalf("ShareLink: %v", share)
 	}
 }
 

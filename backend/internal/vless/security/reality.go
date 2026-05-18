@@ -1,18 +1,19 @@
 package security
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/url"
 	"strings"
-
-	"xray2wg/backend/internal/domain"
 )
 
 // RealitySpec carries the REALITY-specific fields exchanged over a vless:// share-link.
 type RealitySpec struct {
-	ServerName  string
-	Fingerprint string
-	PublicKey   string
-	ShortID     string
-	SpiderX     string
+	ServerName  string `json:"serverName,omitempty"`
+	Fingerprint string `json:"fingerprint,omitempty"`
+	PublicKey   string `json:"publicKey,omitempty"`
+	ShortID     string `json:"shortId,omitempty"`
+	SpiderX     string `json:"spiderX,omitempty"`
 }
 
 type realitySecurity struct{}
@@ -31,10 +32,18 @@ func (realitySecurity) ParseURI(ctx ParseCtx) (Spec, error) {
 	}, nil
 }
 
-func (realitySecurity) Validate(spec Spec) error { return nil }
+// Validate refuses a REALITY spec without a public key: the protocol cannot work without it
+// and a silent failure at tunnel-start time is worse than an explicit error at create time.
+func (realitySecurity) Validate(spec Spec) error {
+	s := spec.(RealitySpec)
+	if s.PublicKey == "" {
+		return fmt.Errorf("reality: missing required pbk (publicKey)")
+	}
+	return nil
+}
 
-// EmitSettings reproduces the historical realitySettings layout with the same defaults: fp
-// falls back to "chrome", spiderX falls back to "/".
+// EmitSettings reproduces the realitySettings layout with the same defaults: fp falls back
+// to "chrome", spiderX to "/".
 func (realitySecurity) EmitSettings(spec Spec) (map[string]any, error) {
 	s := spec.(RealitySpec)
 	fp := s.Fingerprint
@@ -54,33 +63,39 @@ func (realitySecurity) EmitSettings(spec Spec) (map[string]any, error) {
 	}, nil
 }
 
-func (realitySecurity) ApplyToLegacyNode(spec Spec, n *domain.VlessNode) {
-	s := spec.(RealitySpec)
-	if s.ServerName != "" {
-		n.SNI = s.ServerName
-	}
-	if s.Fingerprint != "" {
-		n.Fingerprint = s.Fingerprint
-	}
-	if s.PublicKey != "" {
-		n.PublicKey = s.PublicKey
-	}
-	if s.ShortID != "" {
-		n.ShortID = s.ShortID
-	}
-	if s.SpiderX != "" {
-		n.SpiderX = s.SpiderX
-	}
+func (realitySecurity) EncodeSpec(spec Spec) (json.RawMessage, error) {
+	return json.Marshal(spec.(RealitySpec))
 }
 
-func (realitySecurity) SpecFromLegacyNode(n *domain.VlessNode) Spec {
-	return RealitySpec{
-		ServerName:  n.SNI,
-		Fingerprint: n.Fingerprint,
-		PublicKey:   n.PublicKey,
-		ShortID:     n.ShortID,
-		SpiderX:     n.SpiderX,
+func (realitySecurity) DecodeSpec(data json.RawMessage) (Spec, error) {
+	var s RealitySpec
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &s); err != nil {
+			return nil, err
+		}
 	}
+	return s, nil
+}
+
+func (realitySecurity) ShareLink(spec Spec) (url.Values, error) {
+	s := spec.(RealitySpec)
+	v := url.Values{}
+	if s.ServerName != "" {
+		v.Set("sni", s.ServerName)
+	}
+	if s.Fingerprint != "" {
+		v.Set("fp", s.Fingerprint)
+	}
+	if s.PublicKey != "" {
+		v.Set("pbk", s.PublicKey)
+	}
+	if s.ShortID != "" {
+		v.Set("sid", s.ShortID)
+	}
+	if s.SpiderX != "" {
+		v.Set("spx", s.SpiderX)
+	}
+	return v, nil
 }
 
 func init() { Default.Register(realitySecurity{}) }

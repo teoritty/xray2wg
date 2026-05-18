@@ -123,6 +123,8 @@ export type Subscription = {
 
 export const MANUAL_SUB_NAME = "__manual__";
 
+// Transport-specific parameters are stored as opaque JSON on the backend; the frontend
+// reads them as `unknown` until a transport-specific form decodes them.
 export type VlessNode = {
   ID: number;
   SubscriptionID: number;
@@ -131,14 +133,12 @@ export type VlessNode = {
   Address: string;
   Port: number;
   Flow: string;
+  Encryption: string;
+  PacketEncoding: string;
   Network: string;
+  TransportConfig: unknown;
   Security: string;
-  SNI: string;
-  Fingerprint: string;
-  PublicKey: string;
-  ShortID: string;
-  SpiderX: string;
-  ALPN: string;
+  SecurityConfig: unknown;
   RawURI: string;
   Health: NodeHealthInfo;
 };

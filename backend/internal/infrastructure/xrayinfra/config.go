@@ -94,10 +94,7 @@ func buildInbounds(xrayListenPort, fwmark int, localGatewayIP string) []any {
 }
 
 func buildSingleNodeConfig(node *domain.VlessNode, routeInboundTags []string) (outbounds []any, routing map[string]any) {
-	userObj := map[string]any{"id": node.UUID, "encryption": "none"}
-	if f := strings.TrimSpace(node.Flow); f != "" {
-		userObj["flow"] = f
-	}
+	userObj := vlessUserObject(node)
 	vlessOut := map[string]any{
 		"protocol": "vless",
 		"tag":      "proxy",
@@ -136,10 +133,7 @@ func buildMultiNodeConfig(nodes []*domain.VlessNode, strategy domain.BalancingSt
 	outbounds = []any{map[string]any{"protocol": "freedom", "tag": "direct"}}
 
 	for i, node := range nodes {
-		userObj := map[string]any{"id": node.UUID, "encryption": "none"}
-		if f := strings.TrimSpace(node.Flow); f != "" {
-			userObj["flow"] = f
-		}
+		userObj := vlessUserObject(node)
 		tag := fmt.Sprintf("vless-out-%d", i+1)
 		outEntry := map[string]any{
 			"protocol": "vless",
@@ -205,11 +199,29 @@ func streamSettingsInboundTProxy(_ int) map[string]any {
 	}
 }
 
+// vlessUserObject builds the vnext[].users[0] object, applying defaults: encryption falls
+// back to "none" (the VLESS-1 standard) and packet-encoding is omitted when unset.
+func vlessUserObject(node *domain.VlessNode) map[string]any {
+	enc := node.Encryption
+	if enc == "" {
+		enc = "none"
+	}
+	user := map[string]any{"id": node.UUID, "encryption": enc}
+	if f := strings.TrimSpace(node.Flow); f != "" {
+		user["flow"] = f
+	}
+	if pe := strings.TrimSpace(node.PacketEncoding); pe != "" {
+		user["packetEncoding"] = pe
+	}
+	return user
+}
+
 // streamSettingsOutbound dispatches through the transport and security registries so that
 // every emitted JSON block is sourced from a single per-transport/per-security
-// implementation. The legacy hard-coded defaults (type=tcp, security=reality) are preserved
-// inside the resolution step; the modern canonical defaults are introduced in a later
-// commit alongside the VlessNode redesign.
+// implementation. The decoded TransportSpec / SecuritySpec is sourced from the node's JSON
+// configuration columns; resolution failures degrade to safe defaults (plain TCP, no
+// security) so a tunnel built against an unregistered transport name still produces a
+// valid xray config.
 func streamSettingsOutbound(node *domain.VlessNode) map[string]any {
 	netName := node.Network
 	if netName == "" {
@@ -217,23 +229,29 @@ func streamSettingsOutbound(node *domain.VlessNode) map[string]any {
 	}
 	secName := node.Security
 	if secName == "" {
-		secName = "reality"
+		secName = "none"
 	}
 
 	tr, err := transport.Default.Resolve(netName)
 	if err != nil {
-		// Unknown transport: fall back to plain TCP so xray still receives a valid config
-		// even if a node was created with a transport that has not been registered yet.
 		tr, _ = transport.Default.Resolve("tcp")
 	}
-	tSpec := tr.SpecFromLegacyNode(node)
+	tSpec, err := tr.DecodeSpec(node.TransportConfig)
+	if err != nil {
+		// Corrupt JSON: emit the zero-value spec for the resolved transport so we still
+		// produce a config rather than crashing tunnel startup.
+		tSpec, _ = tr.DecodeSpec(nil)
+	}
 	tSettings, _ := tr.EmitSettings(tSpec)
 
 	sec, err := security.Default.Resolve(secName)
 	if err != nil {
 		sec, _ = security.Default.Resolve("none")
 	}
-	sSpec := sec.SpecFromLegacyNode(node)
+	sSpec, err := sec.DecodeSpec(node.SecurityConfig)
+	if err != nil {
+		sSpec, _ = sec.DecodeSpec(nil)
+	}
 	sSettings, _ := sec.EmitSettings(sSpec)
 
 	out := map[string]any{

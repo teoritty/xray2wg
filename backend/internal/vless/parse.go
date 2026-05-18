@@ -14,7 +14,8 @@ import (
 //
 // Transport- and security-specific parsing is delegated to the registries in
 // vless/transport and vless/security so that adding a new transport or security mode does
-// not require touching this dispatcher.
+// not require touching this dispatcher. The transport and security parameters are stored
+// as opaque JSON in node.TransportConfig / node.SecurityConfig.
 func ParseURI(raw string) (*domain.VlessNode, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
@@ -41,16 +42,17 @@ func ParseURI(raw string) (*domain.VlessNode, error) {
 	}
 	q := u.Query()
 
-	// Defaults preserve the pre-registry behavior: type=tcp, security=reality. These are
-	// changed in a later commit when the canonicalization pass switches to the modern
-	// xray-core defaults; here we are bit-identical with the legacy implementation.
+	// xray-core 2026 defaults: when ?type= or ?security= is missing, fall back to plain TCP
+	// and no security. This differs from the pre-registry parser (which defaulted security
+	// to "reality") because the modern xray docs treat "none" as the unambiguous default;
+	// a REALITY URI always specifies security=reality explicitly.
 	netName := q.Get("type")
 	if netName == "" {
 		netName = "tcp"
 	}
 	secName := q.Get("security")
 	if secName == "" {
-		secName = "reality"
+		secName = "none"
 	}
 
 	tr, err := transport.Default.Resolve(netName)
@@ -62,6 +64,10 @@ func ParseURI(raw string) (*domain.VlessNode, error) {
 		return nil, err
 	}
 	if err := tr.Validate(tSpec); err != nil {
+		return nil, err
+	}
+	tJSON, err := tr.EncodeSpec(tSpec)
+	if err != nil {
 		return nil, err
 	}
 
@@ -76,33 +82,34 @@ func ParseURI(raw string) (*domain.VlessNode, error) {
 	if err := sec.Validate(sSpec); err != nil {
 		return nil, err
 	}
+	sJSON, err := sec.EncodeSpec(sSpec)
+	if err != nil {
+		return nil, err
+	}
 
 	display := u.Fragment
 	if display == "" {
 		display = addr
 	}
 
-	// Pre-populate the legacy flat fields directly from the URI for storage compatibility
-	// (some fields — e.g. alpn — are not consumed by every transport/security combination
-	// but are still serialized into the DB by callers of the pre-registry code). The
-	// per-transport / per-security ApplyToLegacyNode hooks may then override these values.
-	node := &domain.VlessNode{
-		UUID:        user.Username(),
-		Address:     addr,
-		Port:        port,
-		Flow:        strings.TrimSpace(q.Get("flow")),
-		Network:     tr.Name(),
-		Security:    sec.Name(),
-		SNI:         strings.TrimSpace(q.Get("sni")),
-		Fingerprint: strings.TrimSpace(q.Get("fp")),
-		PublicKey:   strings.TrimSpace(q.Get("pbk")),
-		ShortID:     strings.TrimSpace(q.Get("sid")),
-		SpiderX:     strings.TrimSpace(q.Get("spx")),
-		ALPN:        strings.TrimSpace(q.Get("alpn")),
-		DisplayName: display,
-		RawURI:      raw,
+	enc := strings.TrimSpace(q.Get("encryption"))
+	if enc == "" {
+		enc = "none"
 	}
-	sec.ApplyToLegacyNode(sSpec, node)
-	tr.ApplyToLegacyNode(tSpec, node)
-	return node, nil
+	pe := strings.TrimSpace(q.Get("packetEncoding"))
+
+	return &domain.VlessNode{
+		UUID:            user.Username(),
+		Address:         addr,
+		Port:            port,
+		Flow:            strings.TrimSpace(q.Get("flow")),
+		Encryption:      enc,
+		PacketEncoding:  pe,
+		Network:         tr.Name(),
+		TransportConfig: tJSON,
+		Security:        sec.Name(),
+		SecurityConfig:  sJSON,
+		DisplayName:     display,
+		RawURI:          raw,
+	}, nil
 }

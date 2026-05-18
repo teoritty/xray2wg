@@ -35,23 +35,21 @@ func rowSub(r *SubscriptionRow) *domain.Subscription {
 
 func rowNode(n *VlessNodeRow) *domain.VlessNode {
 	return &domain.VlessNode{
-		ID:             n.ID,
-		SubscriptionID: n.SubscriptionID,
-		DisplayName:    n.DisplayName,
-		UUID:           n.UUID,
-		Address:        n.Address,
-		Port:           n.Port,
-		Flow:           n.Flow,
-		Network:        n.Network,
-		Security:       n.Security,
-		SNI:            n.SNI,
-		Fingerprint:    n.Fingerprint,
-		PublicKey:      n.PublicKey,
-		ShortID:        n.ShortID,
-		SpiderX:        n.SpiderX,
-		ALPN:           n.Alpn,
-		RawURI:         n.RawURI,
-		CreatedAt:      n.CreatedAt,
+		ID:              n.ID,
+		SubscriptionID:  n.SubscriptionID,
+		DisplayName:     n.DisplayName,
+		UUID:            n.UUID,
+		Address:         n.Address,
+		Port:            n.Port,
+		Flow:            n.Flow,
+		Encryption:      n.Encryption,
+		PacketEncoding:  n.PacketEncoding,
+		Network:         n.Network,
+		TransportConfig: []byte(n.TransportConfig),
+		Security:        n.Security,
+		SecurityConfig:  []byte(n.SecurityConfig),
+		RawURI:          n.RawURI,
+		CreatedAt:       n.CreatedAt,
 	}
 }
 
@@ -201,21 +199,19 @@ func (r *SubscriptionRepo) InsertNodes(ctx context.Context, nodes []*domain.Vles
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, n := range nodes {
 			row := VlessNodeRow{
-				SubscriptionID: n.SubscriptionID,
-				DisplayName:    n.DisplayName,
-				UUID:           n.UUID,
-				Address:        n.Address,
-				Port:           n.Port,
-				Flow:           n.Flow,
-				Network:        n.Network,
-				Security:       n.Security,
-				SNI:            n.SNI,
-				Fingerprint:    n.Fingerprint,
-				PublicKey:      n.PublicKey,
-				ShortID:        n.ShortID,
-				SpiderX:        n.SpiderX,
-				Alpn:           n.ALPN,
-				RawURI:         n.RawURI,
+				SubscriptionID:  n.SubscriptionID,
+				DisplayName:     n.DisplayName,
+				UUID:            n.UUID,
+				Address:         n.Address,
+				Port:            n.Port,
+				Flow:            n.Flow,
+				Encryption:      n.Encryption,
+				PacketEncoding:  n.PacketEncoding,
+				Network:         n.Network,
+				TransportConfig: jsonOrEmpty(n.TransportConfig),
+				Security:        n.Security,
+				SecurityConfig:  jsonOrEmpty(n.SecurityConfig),
+				RawURI:          n.RawURI,
 			}
 			if err := tx.Create(&row).Error; err != nil {
 				return err
@@ -224,6 +220,16 @@ func (r *SubscriptionRepo) InsertNodes(ctx context.Context, nodes []*domain.Vles
 		}
 		return nil
 	})
+}
+
+// jsonOrEmpty returns "{}" for nil/empty input so the DB column never violates its
+// not-null default; downstream Spec decoders treat "{}" the same as a zero-value Spec.
+func jsonOrEmpty(b []byte) string {
+	s := strings.TrimSpace(string(b))
+	if s == "" {
+		return "{}"
+	}
+	return s
 }
 
 func (r *SubscriptionRepo) ListNodes(ctx context.Context, subscriptionID int64) ([]*domain.VlessNode, error) {
@@ -269,21 +275,19 @@ func (r *SubscriptionRepo) FindTunnelIDsUsingNode(ctx context.Context, nodeID in
 
 func (r *SubscriptionRepo) UpdateNode(ctx context.Context, n *domain.VlessNode) error {
 	res := r.db.WithContext(ctx).Model(&VlessNodeRow{}).Where("id = ?", n.ID).Updates(map[string]any{
-		"subscription_id": n.SubscriptionID,
-		"display_name":    n.DisplayName,
-		"uuid":            n.UUID,
-		"address":         n.Address,
-		"port":            n.Port,
-		"flow":            n.Flow,
-		"network":         n.Network,
-		"security":        n.Security,
-		"sni":             n.SNI,
-		"fingerprint":     n.Fingerprint,
-		"public_key":      n.PublicKey,
-		"short_id":        n.ShortID,
-		"spider_x":        n.SpiderX,
-		"alpn":            n.ALPN,
-		"raw_uri":         n.RawURI,
+		"subscription_id":  n.SubscriptionID,
+		"display_name":     n.DisplayName,
+		"uuid":             n.UUID,
+		"address":          n.Address,
+		"port":             n.Port,
+		"flow":             n.Flow,
+		"encryption":       n.Encryption,
+		"packet_encoding":  n.PacketEncoding,
+		"network":          n.Network,
+		"transport_config": jsonOrEmpty(n.TransportConfig),
+		"security":         n.Security,
+		"security_config":  jsonOrEmpty(n.SecurityConfig),
+		"raw_uri":          n.RawURI,
 	})
 	if res.Error != nil {
 		return res.Error

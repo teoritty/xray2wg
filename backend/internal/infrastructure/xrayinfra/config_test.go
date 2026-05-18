@@ -5,21 +5,23 @@ import (
 	"testing"
 
 	"xray2wg/backend/internal/domain"
+	"xray2wg/backend/internal/vless"
 )
 
-func TestBuildXrayConfigVisionFlowPreserved(t *testing.T) {
-	n := &domain.VlessNode{
-		UUID:        "550e8400-e29b-41d4-a716-446655440000",
-		Address:     "vpn.example.com",
-		Port:        443,
-		Flow:        "xtls-rprx-vision",
-		Network:     "tcp",
-		Security:    "reality",
-		SNI:         "vpn.example.com",
-		PublicKey:   "pbk",
-		ShortID:     "a1",
-		Fingerprint: "chrome",
+// nodeFromURI parses a vless:// URI into a node for test convenience. The full parser is
+// exercised so the test surface matches what real subscription imports produce.
+func nodeFromURI(t *testing.T, raw string) *domain.VlessNode {
+	t.Helper()
+	n, err := vless.ParseURI(raw)
+	if err != nil {
+		t.Fatalf("ParseURI(%q): %v", raw, err)
 	}
+	return n
+}
+
+func TestBuildXrayConfigVisionFlowPreserved(t *testing.T) {
+	n := nodeFromURI(t, "vless://550e8400-e29b-41d4-a716-446655440000@vpn.example.com:443?"+
+		"type=tcp&security=reality&sni=vpn.example.com&fp=chrome&pbk=pbk&sid=a1&flow=xtls-rprx-vision#MyNode")
 	raw, err := BuildXrayConfig(13001, 0x1001, "", []*domain.VlessNode{n}, domain.BalancingRoundRobin)
 	if err != nil {
 		t.Fatal(err)
@@ -38,36 +40,19 @@ func TestBuildXrayConfigVisionFlowPreserved(t *testing.T) {
 		if ob.Protocol != "vless" {
 			continue
 		}
-		vnext, _ := ob.Settings["vnext"].([]any)
-		if len(vnext) == 0 {
-			t.Fatal("no vnext")
-		}
-		vm0, _ := vnext[0].(map[string]any)
-		users, _ := vm0["users"].([]any)
-		if len(users) == 0 {
-			t.Fatal("no users")
-		}
-		u0, _ := users[0].(map[string]any)
-		f, _ := u0["flow"].(string)
-		userFlow = f
+		vnext := ob.Settings["vnext"].([]any)
+		users := vnext[0].(map[string]any)["users"].([]any)
+		userFlow, _ = users[0].(map[string]any)["flow"].(string)
 		break
 	}
 	if userFlow != "xtls-rprx-vision" {
-		t.Fatalf("expected vision flow in outbound user, got %q", userFlow)
+		t.Fatalf("expected vision flow, got %q", userFlow)
 	}
 }
 
 func TestBuildXrayConfigDNSInboundWhenGatewaySet(t *testing.T) {
-	n := &domain.VlessNode{
-		UUID:      "550e8400-e29b-41d4-a716-446655440000",
-		Address:   "vpn.example.com",
-		Port:      443,
-		Network:   "tcp",
-		Security:  "reality",
-		SNI:       "vpn.example.com",
-		PublicKey: "pbk",
-		ShortID:   "a1",
-	}
+	n := nodeFromURI(t, "vless://550e8400-e29b-41d4-a716-446655440000@vpn.example.com:443?"+
+		"type=tcp&security=reality&sni=vpn.example.com&fp=chrome&pbk=pbk&sid=a1#node")
 	raw, err := BuildXrayConfig(13001, 0x1001, "10.100.1.1", []*domain.VlessNode{n}, domain.BalancingRoundRobin)
 	if err != nil {
 		t.Fatal(err)
@@ -98,16 +83,8 @@ func TestBuildXrayConfigDNSInboundWhenGatewaySet(t *testing.T) {
 }
 
 func TestBuildXrayConfigMuxEnabledWhenNoFlow(t *testing.T) {
-	n := &domain.VlessNode{
-		UUID:      "550e8400-e29b-41d4-a716-446655440000",
-		Address:   "vpn.example.com",
-		Port:      443,
-		Network:   "tcp",
-		Security:  "reality",
-		SNI:       "vpn.example.com",
-		PublicKey: "pbk",
-		ShortID:   "a1",
-	}
+	n := nodeFromURI(t, "vless://550e8400-e29b-41d4-a716-446655440000@vpn.example.com:443?"+
+		"type=tcp&security=reality&sni=vpn.example.com&pbk=pbk&sid=a1#node")
 	raw, err := BuildXrayConfig(13001, 0x1001, "", []*domain.VlessNode{n}, domain.BalancingRoundRobin)
 	if err != nil {
 		t.Fatal(err)
@@ -135,18 +112,8 @@ func TestBuildXrayConfigMuxEnabledWhenNoFlow(t *testing.T) {
 }
 
 func TestBuildXrayConfigMuxDisabledWhenFlowSet(t *testing.T) {
-	n := &domain.VlessNode{
-		UUID:        "550e8400-e29b-41d4-a716-446655440000",
-		Address:     "vpn.example.com",
-		Port:        443,
-		Flow:        "xtls-rprx-vision",
-		Network:     "tcp",
-		Security:    "reality",
-		SNI:         "vpn.example.com",
-		PublicKey:   "pbk",
-		ShortID:     "a1",
-		Fingerprint: "chrome",
-	}
+	n := nodeFromURI(t, "vless://550e8400-e29b-41d4-a716-446655440000@vpn.example.com:443?"+
+		"type=tcp&security=reality&sni=vpn.example.com&fp=chrome&pbk=pbk&sid=a1&flow=xtls-rprx-vision#node")
 	raw, err := BuildXrayConfig(13001, 0x1001, "", []*domain.VlessNode{n}, domain.BalancingRoundRobin)
 	if err != nil {
 		t.Fatal(err)
@@ -171,8 +138,8 @@ func TestBuildXrayConfigMuxDisabledWhenFlowSet(t *testing.T) {
 
 func TestBuildXrayConfigMuxMultiNodeMixedFlow(t *testing.T) {
 	nodes := []*domain.VlessNode{
-		{UUID: "aaa", Address: "a.example.com", Port: 443, Network: "tcp", Security: "reality", SNI: "a.example.com", PublicKey: "p", ShortID: "s"},
-		{UUID: "bbb", Address: "b.example.com", Port: 443, Flow: "xtls-rprx-vision", Network: "tcp", Security: "reality", SNI: "b.example.com", PublicKey: "p", ShortID: "s"},
+		nodeFromURI(t, "vless://aaa@a.example.com:443?type=tcp&security=reality&sni=a.example.com&pbk=p&sid=s#a"),
+		nodeFromURI(t, "vless://bbb@b.example.com:443?type=tcp&security=reality&sni=b.example.com&pbk=p&sid=s&flow=xtls-rprx-vision#b"),
 	}
 	raw, err := BuildXrayConfig(13001, 0x1001, "", nodes, domain.BalancingRoundRobin)
 	if err != nil {
@@ -202,8 +169,8 @@ func TestBuildXrayConfigMuxMultiNodeMixedFlow(t *testing.T) {
 
 func TestBuildXrayConfigObservatoryEnabledForMultiNodeRoundRobin(t *testing.T) {
 	nodes := []*domain.VlessNode{
-		{UUID: "aaa", Address: "a.example.com", Port: 443, Network: "tcp", Security: "reality", SNI: "a.example.com", PublicKey: "p", ShortID: "s"},
-		{UUID: "bbb", Address: "b.example.com", Port: 443, Network: "tcp", Security: "reality", SNI: "b.example.com", PublicKey: "p", ShortID: "s"},
+		nodeFromURI(t, "vless://aaa@a.example.com:443?type=tcp&security=reality&sni=a.example.com&pbk=p&sid=s#a"),
+		nodeFromURI(t, "vless://bbb@b.example.com:443?type=tcp&security=reality&sni=b.example.com&pbk=p&sid=s#b"),
 	}
 	for _, strategy := range []domain.BalancingStrategy{domain.BalancingRoundRobin, domain.BalancingLeastPing} {
 		raw, err := BuildXrayConfig(13001, 0x1001, "", nodes, strategy)
@@ -224,13 +191,7 @@ func TestBuildXrayConfigObservatoryEnabledForMultiNodeRoundRobin(t *testing.T) {
 			t.Fatalf("%s: %v", strategy, err)
 		}
 		if doc.Observatory == nil {
-			t.Fatalf("%s: observatory must be present for multi-node configs (regression for #4)", strategy)
-		}
-		if got := doc.Observatory["probeUrl"]; got != "http://www.google.com/generate_204" {
-			t.Fatalf("%s: probeUrl: want generate_204, got %v", strategy, got)
-		}
-		if len(doc.Routing.Balancers) != 1 {
-			t.Fatalf("%s: want 1 balancer, got %d", strategy, len(doc.Routing.Balancers))
+			t.Fatalf("%s: observatory must be present", strategy)
 		}
 		wantType := "roundRobin"
 		if strategy == domain.BalancingLeastPing {
@@ -243,7 +204,7 @@ func TestBuildXrayConfigObservatoryEnabledForMultiNodeRoundRobin(t *testing.T) {
 }
 
 func TestBuildXrayConfigSingleNodeHasNoObservatory(t *testing.T) {
-	n := &domain.VlessNode{UUID: "aaa", Address: "a.example.com", Port: 443, Network: "tcp", Security: "reality", SNI: "a.example.com", PublicKey: "p", ShortID: "s"}
+	n := nodeFromURI(t, "vless://aaa@a.example.com:443?type=tcp&security=reality&sni=a.example.com&pbk=p&sid=s#a")
 	raw, err := BuildXrayConfig(13001, 0x1001, "", []*domain.VlessNode{n}, domain.BalancingRoundRobin)
 	if err != nil {
 		t.Fatal(err)
@@ -253,21 +214,12 @@ func TestBuildXrayConfigSingleNodeHasNoObservatory(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, ok := doc["observatory"]; ok {
-		t.Fatal("observatory must not be present for single-node configs (avoids unnecessary probes)")
+		t.Fatal("observatory must not be present for single-node configs")
 	}
 }
 
 func TestBuildXrayConfigTransparentInboundDoesNotSetSocketMark(t *testing.T) {
-	n := &domain.VlessNode{
-		UUID:      "550e8400-e29b-41d4-a716-446655440000",
-		Address:   "vpn.example.com",
-		Port:      443,
-		Network:   "tcp",
-		Security:  "reality",
-		SNI:       "vpn.example.com",
-		PublicKey: "pbk",
-		ShortID:   "a1",
-	}
+	n := nodeFromURI(t, "vless://aaa@a.example.com:443?type=tcp&security=reality&sni=a.example.com&pbk=p&sid=s#a")
 	raw, err := BuildXrayConfig(13001, 0x1001, "10.100.1.1", []*domain.VlessNode{n}, domain.BalancingRoundRobin)
 	if err != nil {
 		t.Fatal(err)

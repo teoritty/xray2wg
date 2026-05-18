@@ -3,11 +3,10 @@
 package security
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
-
-	"xray2wg/backend/internal/domain"
 )
 
 type Spec any
@@ -22,8 +21,9 @@ type Security interface {
 	ParseURI(ctx ParseCtx) (Spec, error)
 	EmitSettings(spec Spec) (map[string]any, error)
 	Validate(spec Spec) error
-	ApplyToLegacyNode(spec Spec, n *domain.VlessNode)
-	SpecFromLegacyNode(n *domain.VlessNode) Spec
+	EncodeSpec(spec Spec) (json.RawMessage, error)
+	DecodeSpec(data json.RawMessage) (Spec, error)
+	ShareLink(spec Spec) (url.Values, error)
 }
 
 type Registry struct {

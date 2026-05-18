@@ -1,15 +1,15 @@
 package transport
 
 import (
+	"encoding/json"
+	"net/url"
 	"strings"
-
-	"xray2wg/backend/internal/domain"
 )
 
 // WSSpec captures WebSocket transport parameters: HTTP request path and Host header.
 type WSSpec struct {
-	Path string
-	Host string
+	Path string `json:"path,omitempty"`
+	Host string `json:"host,omitempty"`
 }
 
 type wsTransport struct{}
@@ -18,9 +18,7 @@ func (wsTransport) Name() string      { return "ws" }
 func (wsTransport) Aliases() []string { return []string{"websocket"} }
 
 // ParseURI preserves the historical mapping: vless://...?path=&host=&sni=... — the URI
-// "path" feeds the WS request path; "host" falls back into sni if sni is empty so the WS
-// Host header matches the TLS SNI. This matches existing user URIs from common subscription
-// providers.
+// "path" feeds the WS request path; "host" is the WS Host header.
 func (wsTransport) ParseURI(ctx ParseCtx) (Spec, error) {
 	return WSSpec{
 		Path: strings.TrimSpace(ctx.Query.Get("path")),
@@ -45,22 +43,30 @@ func (wsTransport) EmitSettings(spec Spec) (map[string]any, error) {
 	}, nil
 }
 
-// ApplyToLegacyNode and SpecFromLegacyNode preserve the historical encoding where the WS
-// path is stored in node.SpiderX and the WS Host in node.SNI (with sniff-from-host
-// fallback). These shim methods are deleted once VlessNode stops carrying flat transport
-// columns.
-func (wsTransport) ApplyToLegacyNode(spec Spec, n *domain.VlessNode) {
-	s := spec.(WSSpec)
-	if s.Path != "" {
-		n.SpiderX = s.Path
-	}
-	if s.Host != "" && n.SNI == "" {
-		n.SNI = s.Host
-	}
+func (wsTransport) EncodeSpec(spec Spec) (json.RawMessage, error) {
+	return json.Marshal(spec.(WSSpec))
 }
 
-func (wsTransport) SpecFromLegacyNode(n *domain.VlessNode) Spec {
-	return WSSpec{Path: n.SpiderX, Host: n.SNI}
+func (wsTransport) DecodeSpec(data json.RawMessage) (Spec, error) {
+	var s WSSpec
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &s); err != nil {
+			return nil, err
+		}
+	}
+	return s, nil
+}
+
+func (wsTransport) ShareLink(spec Spec) (url.Values, error) {
+	s := spec.(WSSpec)
+	v := url.Values{}
+	if s.Path != "" {
+		v.Set("path", s.Path)
+	}
+	if s.Host != "" {
+		v.Set("host", s.Host)
+	}
+	return v, nil
 }
 
 func init() { Default.Register(wsTransport{}) }

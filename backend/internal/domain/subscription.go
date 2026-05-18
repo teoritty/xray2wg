@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
@@ -32,6 +33,9 @@ type ActiveNodeBinding struct {
 	RawURI        string
 }
 
+// VlessNode is the canonical representation of a VLESS upstream. Transport-specific and
+// security-specific parameters are stored as opaque JSON in TransportConfig / SecurityConfig
+// so adding a new transport does not require schema changes.
 type VlessNode struct {
 	ID             int64
 	SubscriptionID int64
@@ -39,17 +43,22 @@ type VlessNode struct {
 	UUID           string
 	Address        string
 	Port           int
-	Flow           string
-	Network        string
-	Security       string
-	SNI            string
-	Fingerprint    string
-	PublicKey      string
-	ShortID        string
-	SpiderX        string
-	ALPN           string
-	RawURI         string
-	CreatedAt      time.Time
+
+	// User-level VLESS parameters that are not transport-specific.
+	Flow           string // e.g. "xtls-rprx-vision"
+	Encryption     string // typically "none"; reserved for post-quantum modes added later
+	PacketEncoding string // "" (default), "xudp", "none"
+
+	// Stream-transport selection and its decoded JSON parameters.
+	Network         string          // canonical transport name (registered in vless/transport)
+	TransportConfig json.RawMessage // marshaled TransportSpec; "{}" when the transport has no parameters
+
+	// Security selection and its decoded JSON parameters.
+	Security       string          // "none", "tls", "reality"
+	SecurityConfig json.RawMessage // marshaled SecuritySpec
+
+	RawURI    string
+	CreatedAt time.Time
 }
 
 type SubscriptionRepository interface {

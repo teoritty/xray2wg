@@ -5,11 +5,10 @@
 package transport
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
-
-	"xray2wg/backend/internal/domain"
 )
 
 // Spec is the transport-specific decoded parameter struct (WSSpec, GRPCSpec, …). Each
@@ -40,14 +39,15 @@ type Transport interface {
 	EmitSettings(spec Spec) (map[string]any, error)
 	// Validate fails fast on semantically broken Spec values (e.g. missing required field).
 	Validate(spec Spec) error
-	// ApplyToLegacyNode writes Spec values into the flat fields of domain.VlessNode for
-	// backward compatibility with the pre-registry storage layout. Transition shim used
-	// while the rest of the codebase is being migrated; removed once VlessNode is
-	// canonicalized around TransportConfig JSON.
-	ApplyToLegacyNode(spec Spec, n *domain.VlessNode)
-	// SpecFromLegacyNode reconstructs a Spec from the flat fields of domain.VlessNode. Also
-	// part of the transition shim.
-	SpecFromLegacyNode(n *domain.VlessNode) Spec
+	// EncodeSpec marshals a Spec to JSON for persistence in VlessNode.TransportConfig.
+	EncodeSpec(spec Spec) (json.RawMessage, error)
+	// DecodeSpec parses a previously-encoded Spec JSON back into a concrete Spec. An empty
+	// payload returns the zero-value Spec, which is the right thing for transports whose
+	// only configuration is implicit defaults (e.g. plain TCP).
+	DecodeSpec(data json.RawMessage) (Spec, error)
+	// ShareLink produces the subset of vless:// query parameters that re-encode the Spec.
+	// Used when rebuilding a canonical RawURI after a structured edit.
+	ShareLink(spec Spec) (url.Values, error)
 }
 
 // Registry is a name+alias lookup for Transports. After all init()s have run the registry is
