@@ -130,8 +130,12 @@ func buildSingleNodeConfig(node *domain.VlessNode, routeInboundTags []string) (o
 }
 
 func buildMultiNodeConfig(nodes []*domain.VlessNode, strategy domain.BalancingStrategy, routeInboundTags []string) (outbounds []any, routing map[string]any, observatory map[string]any) {
-	outbounds = []any{map[string]any{"protocol": "freedom", "tag": "direct"}}
-
+	// VLESS outbounds first; the freedom "direct" outbound goes last. xray-core uses the
+	// first registered outbound as the implicit default handler — if a request ever slipped
+	// past the routing rule and the balancer returned an empty tag, having "direct" first
+	// would silently send traffic out unencrypted from the xray2wg host. Putting a VLESS
+	// outbound first ensures the implicit default also stays inside the tunnel.
+	outbounds = nil
 	for i, node := range nodes {
 		userObj := vlessUserObject(node)
 		tag := fmt.Sprintf("vless-out-%d", i+1)
@@ -154,19 +158,31 @@ func buildMultiNodeConfig(nodes []*domain.VlessNode, strategy domain.BalancingSt
 		}
 		outbounds = append(outbounds, outEntry)
 	}
+	outbounds = append(outbounds, map[string]any{"protocol": "freedom", "tag": "direct"})
 
 	strategyType := "roundRobin"
 	if strategy == domain.BalancingLeastPing {
 		strategyType = "leastPing"
 	}
 
+	// fallbackTag does two important things at once (see xray-core
+	// app/router/balancing.go:32-40 and 95-119):
+	//   1. RoundRobinStrategy.InjectContext only attaches the observatory feature when
+	//      FallbackTag is non-empty. Without it the strategy never consults observatory
+	//      data and keeps rotating through dead outbounds — exactly the failure mode
+	//      that caused 50% of client requests to hit "Empty reply from server".
+	//   2. If the balancer ever returns an empty tag (all outbounds dead, override empty,
+	//      no candidates), it returns fallbackTag instead of bubbling up to xray's
+	//      implicit default outbound. We point it at the first VLESS outbound so a
+	//      misconfiguration never leaks traffic to "direct".
 	routing = map[string]any{
 		"domainStrategy": "AsIs",
 		"balancers": []any{
 			map[string]any{
-				"tag":      "main-balancer",
-				"selector": []string{"vless-out-"},
-				"strategy": map[string]any{"type": strategyType},
+				"tag":         "main-balancer",
+				"selector":    []string{"vless-out-"},
+				"strategy":    map[string]any{"type": strategyType},
+				"fallbackTag": "vless-out-1",
 			},
 		},
 		"rules": []any{
@@ -178,13 +194,14 @@ func buildMultiNodeConfig(nodes []*domain.VlessNode, strategy domain.BalancingSt
 		},
 	}
 
-	// Observatory is required for any multi-node balancer: xray-core's roundRobin strategy rotates
-	// only among outbounds the observatory reports as alive. Without it the balancer silently
-	// degrades to a single outbound (see issue #4). leastPing additionally relies on the measured
-	// delay; roundRobin only needs the liveness signal.
+	// Observatory probes each matched outbound and feeds liveness back to the balancer (via
+	// the strategy's observatory pointer wired up by fallbackTag above). The probe target
+	// performs a full TLS handshake against a real CDN endpoint — using a tiny HTTP/204
+	// responder gave false positives for upstreams that pass the tiny request but block
+	// real HTTPS traffic.
 	observatory = map[string]any{
 		"subjectSelector":   []string{"vless-out-"},
-		"probeUrl":          "http://www.google.com/generate_204",
+		"probeUrl":          "https://www.cloudflare.com/cdn-cgi/trace",
 		"probeInterval":     "10s",
 		"enableConcurrency": true,
 	}

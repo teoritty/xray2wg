@@ -181,9 +181,10 @@ func TestBuildXrayConfigObservatoryEnabledForMultiNodeRoundRobin(t *testing.T) {
 			Observatory map[string]any `json:"observatory"`
 			Routing     struct {
 				Balancers []struct {
-					Tag      string         `json:"tag"`
-					Selector []string       `json:"selector"`
-					Strategy map[string]any `json:"strategy"`
+					Tag         string         `json:"tag"`
+					Selector    []string       `json:"selector"`
+					FallbackTag string         `json:"fallbackTag"`
+					Strategy    map[string]any `json:"strategy"`
 				} `json:"balancers"`
 			} `json:"routing"`
 		}
@@ -200,6 +201,62 @@ func TestBuildXrayConfigObservatoryEnabledForMultiNodeRoundRobin(t *testing.T) {
 		if got := doc.Routing.Balancers[0].Strategy["type"]; got != wantType {
 			t.Fatalf("%s: balancer strategy type: want %s, got %v", strategy, wantType, got)
 		}
+		// fallbackTag is what wires the observatory into the strategy (xray-core
+		// app/router/balancing.go:32-40). Without it RoundRobinStrategy never filters
+		// dead outbounds and traffic flips between alive and dead nodes at ~50%.
+		if got := doc.Routing.Balancers[0].FallbackTag; got != "vless-out-1" {
+			t.Fatalf("%s: balancer fallbackTag: want vless-out-1, got %q", strategy, got)
+		}
+	}
+}
+
+func TestBuildXrayConfigMultiNode_directOutboundIsLast(t *testing.T) {
+	nodes := []*domain.VlessNode{
+		nodeFromURI(t, "vless://aaa@a.example.com:443?type=tcp&security=reality&sni=a.example.com&pbk=p&sid=s#a"),
+		nodeFromURI(t, "vless://bbb@b.example.com:443?type=tcp&security=reality&sni=b.example.com&pbk=p&sid=s#b"),
+	}
+	raw, err := BuildXrayConfig(13001, 0x1001, "", nodes, domain.BalancingRoundRobin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Outbounds) < 2 {
+		t.Fatalf("expected at least 2 outbounds, got %d", len(doc.Outbounds))
+	}
+	// xray-core uses the first outbound as the implicit default handler. Putting "direct"
+	// first would silently leak traffic when any routing edge case occurs.
+	if got := doc.Outbounds[0]["tag"]; got != "vless-out-1" {
+		t.Fatalf("first outbound must be vless-out-1 to avoid default-handler leak; got %v", got)
+	}
+	last := doc.Outbounds[len(doc.Outbounds)-1]
+	if last["tag"] != "direct" || last["protocol"] != "freedom" {
+		t.Fatalf("last outbound must be the freedom 'direct' fallback; got %v", last)
+	}
+}
+
+func TestBuildXrayConfigMultiNode_observatoryUsesHTTPSProbe(t *testing.T) {
+	nodes := []*domain.VlessNode{
+		nodeFromURI(t, "vless://aaa@a.example.com:443?type=tcp&security=reality&sni=a.example.com&pbk=p&sid=s#a"),
+		nodeFromURI(t, "vless://bbb@b.example.com:443?type=tcp&security=reality&sni=b.example.com&pbk=p&sid=s#b"),
+	}
+	raw, err := BuildXrayConfig(13001, 0x1001, "", nodes, domain.BalancingRoundRobin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Observatory map[string]any `json:"observatory"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := doc.Observatory["probeUrl"].(string)
+	if got == "" || got[:6] != "https:" {
+		t.Fatalf("probeUrl must use HTTPS for a representative liveness signal; got %q", got)
 	}
 }
 
