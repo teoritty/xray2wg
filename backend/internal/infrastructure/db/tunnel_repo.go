@@ -148,6 +148,13 @@ func (r *TunnelRepo) Delete(ctx context.Context, id int64) error {
 		if err := tx.Where("interface_id = ?", id).Delete(&WgPeerRow{}).Error; err != nil {
 			return err
 		}
+		// tunnel_nodes holds the multi-VLESS junction rows. Its interface_id FK is enforced
+		// by SQLite (pragma foreign_keys=1) without ON DELETE CASCADE, so the wg_interfaces
+		// DELETE below fails for any tunnel that has assigned nodes unless we clear them
+		// here first.
+		if err := tx.Where("interface_id = ?", id).Delete(&TunnelNodeRow{}).Error; err != nil {
+			return err
+		}
 		res := tx.Delete(&WgInterfaceRow{}, id)
 		if res.Error != nil {
 			return res.Error
