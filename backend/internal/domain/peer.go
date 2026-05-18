@@ -33,6 +33,11 @@ type PeerRepository interface {
 	ListAllWithTunnel(ctx context.Context) ([]*PeerWithTunnel, error)
 	Update(ctx context.Context, p *WgPeer, privKeyEnc, pskEnc *string) error
 	Delete(ctx context.Context, ifaceID int64, peerID int64) error
-	UpdateTraffic(ctx context.Context, peerID int64, lastHS *time.Time, rx, tx int64) error
+	// UpdateTraffic accumulates wireguard cumulative byte counters into the peer's running
+	// totals. rxRaw/txRaw are the current cumulative values reported by wireguard-go; the
+	// repository stores the previous raw values per peer and adds only the delta, so a
+	// userspace device restart (which resets the wg counters to zero) no longer truncates
+	// the dashboard totals. Returns the new accumulated rx/tx after the update.
+	UpdateTraffic(ctx context.Context, peerID int64, lastHS *time.Time, rxRaw, txRaw int64) (accumRx, accumTx int64, err error)
 	GetByPubKey(ctx context.Context, ifaceID int64, pubkey string) (*WgPeer, error)
 }

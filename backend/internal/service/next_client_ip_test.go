@@ -28,8 +28,8 @@ func (s stubPeerRepo) Update(context.Context, *domain.WgPeer, *string, *string) 
 	return nil
 }
 func (s stubPeerRepo) Delete(context.Context, int64, int64) error { return nil }
-func (s stubPeerRepo) UpdateTraffic(context.Context, int64, *time.Time, int64, int64) error {
-	return nil
+func (s stubPeerRepo) UpdateTraffic(context.Context, int64, *time.Time, int64, int64) (int64, int64, error) {
+	return 0, 0, nil
 }
 func (s stubPeerRepo) GetByPubKey(context.Context, int64, string) (*domain.WgPeer, error) {
 	return nil, domain.ErrNotFound

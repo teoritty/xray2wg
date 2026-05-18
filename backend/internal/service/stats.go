@@ -116,26 +116,30 @@ func (s *StatsCollector) tick(ctx context.Context) {
 				t := st.LastHandshake
 				lhs = &t
 			}
-			_ = s.peers.UpdateTraffic(ctx, p.ID, lhs, st.RxBytes, st.TxBytes)
-			sumRx += st.RxBytes
-			sumTx += st.TxBytes
+			accumRx, accumTx, err := s.peers.UpdateTraffic(ctx, p.ID, lhs, st.RxBytes, st.TxBytes)
+			if err != nil {
+				ctxlog.From(ctx).Warn().Int64("peer_id", p.ID).Err(err).Msg("stats tick: UpdateTraffic failed")
+				continue
+			}
+			sumRx += accumRx
+			sumTx += accumTx
 			if !st.LastHandshake.IsZero() && now.Sub(st.LastHandshake) < 3*time.Minute {
 				active++
 			}
 			prev := s.lastSeen[p.ID]
 			dt := 2.0
-			rxR := int64(float64(st.RxBytes-prev[0]) / dt)
-			txR := int64(float64(st.TxBytes-prev[1]) / dt)
+			rxR := int64(float64(accumRx-prev[0]) / dt)
+			txR := int64(float64(accumTx-prev[1]) / dt)
 			if rxR < 0 {
 				rxR = 0
 			}
 			if txR < 0 {
 				txR = 0
 			}
-			s.lastSeen[p.ID] = [2]int64{st.RxBytes, st.TxBytes}
+			s.lastSeen[p.ID] = [2]int64{accumRx, accumTx}
 			pid := p.ID
 			_ = s.repo.Insert(ctx, &domain.StatSnapshot{
-				PeerID: &pid, RxBytes: st.RxBytes, TxBytes: st.TxBytes, RxRate: rxR, TxRate: txR, SampledAt: now,
+				PeerID: &pid, RxBytes: accumRx, TxBytes: accumTx, RxRate: rxR, TxRate: txR, SampledAt: now,
 			})
 		}
 

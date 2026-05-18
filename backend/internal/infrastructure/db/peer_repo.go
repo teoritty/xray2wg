@@ -138,12 +138,48 @@ func (r *PeerRepo) Delete(ctx context.Context, ifaceID int64, peerID int64) erro
 	return nil
 }
 
-func (r *PeerRepo) UpdateTraffic(ctx context.Context, peerID int64, lastHS *time.Time, rx, tx int64) error {
-	return r.db.WithContext(ctx).Model(&WgPeerRow{}).Where("id = ?", peerID).Updates(map[string]any{
-		"last_handshake": lastHS,
-		"rx_bytes":       rx,
-		"tx_bytes":       tx,
-	}).Error
+// UpdateTraffic adds the delta of rxRaw/txRaw (current cumulative counters from wireguard-go)
+// relative to the previously recorded raw counters into rx_bytes/tx_bytes, then stores the new
+// raw values. If the raw counters regress (userspace device restart zeroes them) the delta is
+// the full new raw value — i.e. we treat the new cumulative as fresh-from-zero, never losing
+// already accumulated bytes. All of this happens in one UPDATE so a concurrent reader either
+// sees the pre- or post-state, never a torn intermediate.
+//
+// Returns the new accumulated rx/tx so the caller can sum interface-level totals without an
+// extra SELECT.
+func (r *PeerRepo) UpdateTraffic(ctx context.Context, peerID int64, lastHS *time.Time, rxRaw, txRaw int64) (int64, int64, error) {
+	if rxRaw < 0 {
+		rxRaw = 0
+	}
+	if txRaw < 0 {
+		txRaw = 0
+	}
+	// SQLite supports CASE in UPDATE; we compute the delta inline so the operation is atomic.
+	res := r.db.WithContext(ctx).Exec(`
+		UPDATE wg_peers SET
+			rx_bytes = rx_bytes + CASE WHEN ? >= last_seen_rx_raw THEN ? - last_seen_rx_raw ELSE ? END,
+			tx_bytes = tx_bytes + CASE WHEN ? >= last_seen_tx_raw THEN ? - last_seen_tx_raw ELSE ? END,
+			last_seen_rx_raw = ?,
+			last_seen_tx_raw = ?,
+			last_handshake = ?,
+			updated_at = ?
+		WHERE id = ?
+	`,
+		rxRaw, rxRaw, rxRaw,
+		txRaw, txRaw, txRaw,
+		rxRaw, txRaw, lastHS, time.Now().UTC(), peerID,
+	)
+	if res.Error != nil {
+		return 0, 0, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return 0, 0, domain.ErrNotFound
+	}
+	var row WgPeerRow
+	if err := r.db.WithContext(ctx).Select("rx_bytes", "tx_bytes").Where("id = ?", peerID).First(&row).Error; err != nil {
+		return 0, 0, err
+	}
+	return row.RxBytes, row.TxBytes, nil
 }
 
 func (r *PeerRepo) GetByPubKey(ctx context.Context, ifaceID int64, pubkey string) (*domain.WgPeer, error) {

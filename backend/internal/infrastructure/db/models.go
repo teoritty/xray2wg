@@ -103,6 +103,12 @@ type WgPeerRow struct {
 	LastHandshake       *time.Time
 	RxBytes             int64 `gorm:"default:0"`
 	TxBytes             int64 `gorm:"default:0"`
+	// LastSeenRxRaw / LastSeenTxRaw store the most recent cumulative counters reported by
+	// wireguard-go for this peer. They let UpdateTraffic compute the delta since the prior
+	// poll, so a wg device restart (which zeroes the cumulative counters) does not erase
+	// the accumulated totals in rx_bytes / tx_bytes (issue #5).
+	LastSeenRxRaw int64 `gorm:"not null;default:0"`
+	LastSeenTxRaw int64 `gorm:"not null;default:0"`
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 
