@@ -251,6 +251,77 @@ func (s *SubscriptionService) AddManualVlessNode(ctx context.Context, raw string
 	return node, nil
 }
 
+// AddManualNodeStructured is the structured counterpart of AddManualVlessNode: it accepts
+// fully-typed transport and security configurations instead of a vless:// URI string. The
+// canonical RawURI is rebuilt internally so downstream code (subscription refresh,
+// duplicate detection) keeps a single source of truth.
+func (s *SubscriptionService) AddManualNodeStructured(ctx context.Context, in vless.BuildInput) (*domain.VlessNode, error) {
+	node, err := vless.Build(in)
+	if err != nil {
+		return nil, err
+	}
+	manualID, err := s.EnsureManual(ctx)
+	if err != nil {
+		return nil, err
+	}
+	node.SubscriptionID = manualID
+	existing, err := s.repo.ListNodes(ctx, manualID)
+	if err != nil {
+		return nil, err
+	}
+	key := strings.TrimSpace(node.RawURI)
+	for _, e := range existing {
+		if strings.TrimSpace(e.RawURI) == key {
+			return nil, domain.ErrConflict
+		}
+	}
+	if err := s.repo.InsertNodes(ctx, []*domain.VlessNode{node}); err != nil {
+		return nil, err
+	}
+	if err := s.syncManualSubscriptionMeta(ctx, manualID); err != nil {
+		return nil, err
+	}
+	return node, nil
+}
+
+// UpdateManualNodeStructured mirrors UpdateManualVlessNode for structured input.
+func (s *SubscriptionService) UpdateManualNodeStructured(ctx context.Context, nodeID int64, in vless.BuildInput) (*domain.VlessNode, error) {
+	manualID, err := s.EnsureManual(ctx)
+	if err != nil {
+		return nil, err
+	}
+	existing, err := s.repo.GetNode(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.SubscriptionID != manualID {
+		return nil, domain.ErrNotFound
+	}
+	node, err := vless.Build(in)
+	if err != nil {
+		return nil, err
+	}
+	node.SubscriptionID = manualID
+	node.ID = nodeID
+	others, err := s.repo.ListNodes(ctx, manualID)
+	if err != nil {
+		return nil, err
+	}
+	key := strings.TrimSpace(node.RawURI)
+	for _, e := range others {
+		if e.ID != nodeID && strings.TrimSpace(e.RawURI) == key {
+			return nil, domain.ErrConflict
+		}
+	}
+	if err := s.repo.UpdateNode(ctx, node); err != nil {
+		return nil, err
+	}
+	if err := s.syncManualSubscriptionMeta(ctx, manualID); err != nil {
+		return nil, err
+	}
+	return s.repo.GetNode(ctx, nodeID)
+}
+
 // UpdateManualVlessNode replaces fields for an existing node under __manual__ from a new vless:// URI.
 func (s *SubscriptionService) UpdateManualVlessNode(ctx context.Context, nodeID int64, raw string) (*domain.VlessNode, error) {
 	raw = strings.TrimSpace(raw)

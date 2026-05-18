@@ -40,14 +40,29 @@ func MountSubscriptions(api *echo.Group, d *apideps.Deps) {
 		return c.JSON(http.StatusCreated, su)
 	})
 
+	// Manual-node creation accepts two body shapes:
+	//   1. {"vless_uri": "vless://..."}             — fast path: paste a share-link.
+	//   2. {"uuid": "...", "network": "xhttp", ...} — structured: fields from a UI form.
+	// The transport / security parameters in the structured form live inside opaque JSON
+	// payloads so this endpoint never has to grow when a new transport is registered.
 	api.POST("/subscriptions/manual-nodes", func(c echo.Context) error {
 		var in struct {
-			VlessURI string `json:"vless_uri"`
+			VlessURI string             `json:"vless_uri"`
+			Manual   *app.ManualNodeInput `json:"manual,omitempty"`
 		}
 		if err := c.Bind(&in); err != nil {
 			return domain.ErrValidation
 		}
-		node, err := sapi.AddManualVlessNode(c.Request().Context(), in.VlessURI)
+		var (
+			node *domain.VlessNode
+			err  error
+		)
+		switch {
+		case in.Manual != nil:
+			node, err = sapi.AddManualNodeStructured(c.Request().Context(), *in.Manual)
+		default:
+			node, err = sapi.AddManualVlessNode(c.Request().Context(), in.VlessURI)
+		}
 		if err != nil {
 			return err
 		}
@@ -60,12 +75,19 @@ func MountSubscriptions(api *echo.Group, d *apideps.Deps) {
 			return domain.ErrValidation
 		}
 		var in struct {
-			VlessURI string `json:"vless_uri"`
+			VlessURI string             `json:"vless_uri"`
+			Manual   *app.ManualNodeInput `json:"manual,omitempty"`
 		}
 		if err := c.Bind(&in); err != nil {
 			return domain.ErrValidation
 		}
-		node, err := sapi.UpdateManualVlessNode(c.Request().Context(), nodeID, in.VlessURI)
+		var node *domain.VlessNode
+		switch {
+		case in.Manual != nil:
+			node, err = sapi.UpdateManualNodeStructured(c.Request().Context(), nodeID, *in.Manual)
+		default:
+			node, err = sapi.UpdateManualVlessNode(c.Request().Context(), nodeID, in.VlessURI)
+		}
 		if err != nil {
 			return err
 		}
