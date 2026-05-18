@@ -200,6 +200,63 @@ func TestBuildXrayConfigMuxMultiNodeMixedFlow(t *testing.T) {
 	}
 }
 
+func TestBuildXrayConfigObservatoryEnabledForMultiNodeRoundRobin(t *testing.T) {
+	nodes := []*domain.VlessNode{
+		{UUID: "aaa", Address: "a.example.com", Port: 443, Network: "tcp", Security: "reality", SNI: "a.example.com", PublicKey: "p", ShortID: "s"},
+		{UUID: "bbb", Address: "b.example.com", Port: 443, Network: "tcp", Security: "reality", SNI: "b.example.com", PublicKey: "p", ShortID: "s"},
+	}
+	for _, strategy := range []domain.BalancingStrategy{domain.BalancingRoundRobin, domain.BalancingLeastPing} {
+		raw, err := BuildXrayConfig(13001, 0x1001, "", nodes, strategy)
+		if err != nil {
+			t.Fatalf("%s: %v", strategy, err)
+		}
+		var doc struct {
+			Observatory map[string]any `json:"observatory"`
+			Routing     struct {
+				Balancers []struct {
+					Tag      string         `json:"tag"`
+					Selector []string       `json:"selector"`
+					Strategy map[string]any `json:"strategy"`
+				} `json:"balancers"`
+			} `json:"routing"`
+		}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatalf("%s: %v", strategy, err)
+		}
+		if doc.Observatory == nil {
+			t.Fatalf("%s: observatory must be present for multi-node configs (regression for #4)", strategy)
+		}
+		if got := doc.Observatory["probeUrl"]; got != "http://www.google.com/generate_204" {
+			t.Fatalf("%s: probeUrl: want generate_204, got %v", strategy, got)
+		}
+		if len(doc.Routing.Balancers) != 1 {
+			t.Fatalf("%s: want 1 balancer, got %d", strategy, len(doc.Routing.Balancers))
+		}
+		wantType := "roundRobin"
+		if strategy == domain.BalancingLeastPing {
+			wantType = "leastPing"
+		}
+		if got := doc.Routing.Balancers[0].Strategy["type"]; got != wantType {
+			t.Fatalf("%s: balancer strategy type: want %s, got %v", strategy, wantType, got)
+		}
+	}
+}
+
+func TestBuildXrayConfigSingleNodeHasNoObservatory(t *testing.T) {
+	n := &domain.VlessNode{UUID: "aaa", Address: "a.example.com", Port: 443, Network: "tcp", Security: "reality", SNI: "a.example.com", PublicKey: "p", ShortID: "s"}
+	raw, err := BuildXrayConfig(13001, 0x1001, "", []*domain.VlessNode{n}, domain.BalancingRoundRobin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := doc["observatory"]; ok {
+		t.Fatal("observatory must not be present for single-node configs (avoids unnecessary probes)")
+	}
+}
+
 func TestBuildXrayConfigTransparentInboundDoesNotSetSocketMark(t *testing.T) {
 	n := &domain.VlessNode{
 		UUID:      "550e8400-e29b-41d4-a716-446655440000",

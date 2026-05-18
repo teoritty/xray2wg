@@ -198,13 +198,15 @@ func buildMultiNodeConfig(nodes []*domain.VlessNode, strategy domain.BalancingSt
 		},
 	}
 
-	if strategy == domain.BalancingLeastPing {
-		observatory = map[string]any{
-			"subjectSelector":   []string{"vless-out-"},
-			"probeUrl":          "http://www.google.com/generate_204",
-			"probeInterval":     "10s",
-			"enableConcurrency": true,
-		}
+	// Observatory is required for any multi-node balancer: xray-core's roundRobin strategy rotates
+	// only among outbounds the observatory reports as alive. Without it the balancer silently
+	// degrades to a single outbound (see issue #4). leastPing additionally relies on the measured
+	// delay; roundRobin only needs the liveness signal.
+	observatory = map[string]any{
+		"subjectSelector":   []string{"vless-out-"},
+		"probeUrl":          "http://www.google.com/generate_204",
+		"probeInterval":     "10s",
+		"enableConcurrency": true,
 	}
 	return
 }
