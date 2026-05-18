@@ -26,8 +26,8 @@ func TestRegistry_resolvesCanonicalAndAlias(t *testing.T) {
 }
 
 func TestRegistry_unknownTransportReturnsError(t *testing.T) {
-	if _, err := Default.Resolve("xhttp"); err == nil {
-		t.Fatal("expected unknown-transport error for xhttp at this point in the migration")
+	if _, err := Default.Resolve("hysteria"); err == nil {
+		t.Fatal("expected unknown-transport error for an unregistered name")
 	}
 	if _, err := Default.Resolve(""); err == nil {
 		t.Fatal("expected error for empty transport name")
