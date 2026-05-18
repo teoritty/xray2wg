@@ -36,6 +36,7 @@ type WgInterface struct {
 	WgAddress         string
 	DNS               string
 	MTU               int
+	MSSClamp          int
 	SubscriptionID    *int64
 	ActiveNodeID      *int64
 	XrayPort          int

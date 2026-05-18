@@ -2,7 +2,7 @@
 
 package netconf
 
-func SetupTProxy(tunnelID int, tunName string, xrayPort int, fwmark int, localGatewayIP string, vlessFlow string) error {
+func SetupTProxy(tunnelID int, tunName string, xrayPort int, fwmark int, localGatewayIP string, vlessFlow string, mssClamp int) error {
 	return nil
 }
 

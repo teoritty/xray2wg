@@ -40,6 +40,7 @@ func MountTunnels(api *echo.Group, d *apideps.Deps) {
 			WgAddress         string  `json:"wg_address"`
 			DNS               string  `json:"dns"`
 			MTU               int     `json:"mtu"`
+			MSSClamp          int     `json:"mss_clamp"`
 			SubscriptionID    *int64  `json:"subscription_id"`
 			ActiveNodeID      *int64  `json:"active_node_id"`
 			NodeIDs           []int64 `json:"node_ids"`
@@ -55,6 +56,7 @@ func MountTunnels(api *echo.Group, d *apideps.Deps) {
 			WgAddress:         in.WgAddress,
 			DNS:               in.DNS,
 			MTU:               in.MTU,
+			MSSClamp:          in.MSSClamp,
 			SubscriptionID:    in.SubscriptionID,
 			ActiveNodeID:      in.ActiveNodeID,
 			NodeIDs:           in.NodeIDs,

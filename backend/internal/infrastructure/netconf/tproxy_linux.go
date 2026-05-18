@@ -21,7 +21,15 @@ const tableMangle = "mangle"
 //
 // vlessFlow: when it is XTLS Vision without vision-udp443, UDP/443 (QUIC) is dropped before TPROXY so the
 // client retries on TCP/443 instead of hitting "XTLS rejected UDP/443 traffic" on the outbound.
-func SetupTProxy(tunnelID int, tunName string, xrayPort int, fwmark int, localGatewayIP string, vlessFlow string) error {
+// defaultMSSClamp keeps TCP segments small enough to survive WG (60B overhead) plus a nested
+// VLESS encapsulation (Reality/XTLS/WS/xhttp each add 40-80B). 1280 is the IPv6 minimum and
+// the safest default when the upstream path MTU is unknown.
+const defaultMSSClamp = 1280
+
+func SetupTProxy(tunnelID int, tunName string, xrayPort int, fwmark int, localGatewayIP string, vlessFlow string, mssClamp int) error {
+	if mssClamp <= 0 {
+		mssClamp = defaultMSSClamp
+	}
 	log.Info().
 		Int("tunnel_id", tunnelID).
 		Str("tun", tunName).
@@ -29,6 +37,7 @@ func SetupTProxy(tunnelID int, tunName string, xrayPort int, fwmark int, localGa
 		Int("fwmark", fwmark).
 		Str("local_gateway", strings.TrimSpace(localGatewayIP)).
 		Str("vless_flow", strings.TrimSpace(vlessFlow)).
+		Int("mss_clamp", mssClamp).
 		Bool("drop_quic_udp443", dropQUICVision(vlessFlow)).
 		Msg("tunnel_trace tproxy: begin SetupTProxy")
 
@@ -74,7 +83,7 @@ func SetupTProxy(tunnelID int, tunName string, xrayPort int, fwmark int, localGa
 		return err
 	}
 	// Shrink TCP MSS before TPROXY so WG+VLESS path does not black-hole large TLS segments.
-	mss := []string{"-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", "1360"}
+	mss := []string{"-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(mssClamp)}
 	tcp := []string{"-p", "tcp", "-j", "TPROXY", "--on-port", port, "--tproxy-mark", mark}
 	udp := []string{"-p", "udp", "-j", "TPROXY", "--on-port", port, "--tproxy-mark", mark}
 	log.Info().Str("chain", chain).Strs("rule_mss", mss).Msg("tunnel_trace tproxy: append TCPMSS (before TPROXY)")

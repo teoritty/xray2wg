@@ -152,6 +152,7 @@ export type WgInterface = {
   WgAddress: string;
   DNS: string;
   MTU: number;
+  MSSClamp: number;
   SubscriptionID: number | null;
   ActiveNodeID: number | null;
   XrayPort: number;
@@ -261,6 +262,7 @@ export type TunnelCreateBody = {
   wg_address: string;
   dns: string;
   mtu: number;
+  mss_clamp?: number;
   subscription_id: number | null;
   active_node_id: number | null;
   node_ids?: number[];

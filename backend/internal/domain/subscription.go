@@ -33,6 +33,14 @@ type ActiveNodeBinding struct {
 	RawURI        string
 }
 
+// TunnelNodeBinding captures one tunnel_nodes row by raw_uri so the junction survives a
+// subscription refresh that wipes and re-inserts vless_nodes with fresh IDs.
+type TunnelNodeBinding struct {
+	WgInterfaceID int64
+	RawURI        string
+	Position      int
+}
+
 // VlessNode is the canonical representation of a VLESS upstream. Transport-specific and
 // security-specific parameters are stored as opaque JSON in TransportConfig / SecurityConfig
 // so adding a new transport does not require schema changes.
@@ -70,6 +78,8 @@ type SubscriptionRepository interface {
 	DeleteNodes(ctx context.Context, subscriptionID int64) error
 	SnapshotActiveNodesForSubscription(ctx context.Context, subscriptionID int64) ([]ActiveNodeBinding, error)
 	RemapActiveNodesAfterRefresh(ctx context.Context, subscriptionID int64, bindings []ActiveNodeBinding, newNodes []*VlessNode) error
+	SnapshotTunnelNodesForSubscription(ctx context.Context, subscriptionID int64) ([]TunnelNodeBinding, error)
+	RestoreTunnelNodesAfterRefresh(ctx context.Context, subscriptionID int64, bindings []TunnelNodeBinding, newNodes []*VlessNode) error
 	InsertNodes(ctx context.Context, nodes []*VlessNode) error
 	ListNodes(ctx context.Context, subscriptionID int64) ([]*VlessNode, error)
 	ListAllNodes(ctx context.Context) ([]*VlessNode, error)

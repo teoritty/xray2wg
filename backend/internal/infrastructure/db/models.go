@@ -65,6 +65,7 @@ type WgInterfaceRow struct {
 	WgAddress        string `gorm:"not null"`
 	DNS              string `gorm:"default:'1.1.1.1,8.8.8.8'"`
 	MTU              int    `gorm:"default:1420"`
+	MSSClamp         int    `gorm:"not null;default:1280"`
 	SubscriptionID   *int64
 	ActiveNodeID     *int64
 	XrayPort         int

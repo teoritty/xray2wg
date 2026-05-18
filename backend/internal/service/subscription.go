@@ -165,6 +165,13 @@ func (s *SubscriptionService) FetchAndUpdate(ctx context.Context, id int64) erro
 	if err != nil {
 		return err
 	}
+	// Capture multi-VLESS junction rows by raw_uri so they survive the DeleteNodes cascade
+	// (#7: tunnel_nodes for this subscription were silently dropped, leaving the edit form
+	// and balancer with an empty node list every time a refresh ran).
+	tunnelBindings, err := s.repo.SnapshotTunnelNodesForSubscription(ctx, id)
+	if err != nil {
+		return err
+	}
 	if err := s.repo.DeleteNodes(ctx, id); err != nil {
 		return err
 	}
@@ -173,6 +180,9 @@ func (s *SubscriptionService) FetchAndUpdate(ctx context.Context, id int64) erro
 			return err
 		}
 		if err := s.repo.RemapActiveNodesAfterRefresh(ctx, id, bindings, nodes); err != nil {
+			return err
+		}
+		if err := s.repo.RestoreTunnelNodesAfterRefresh(ctx, id, tunnelBindings, nodes); err != nil {
 			return err
 		}
 	}

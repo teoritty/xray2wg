@@ -43,6 +43,7 @@ export function TunnelFormPage() {
   const [wgAddress, setWgAddress] = useState("");
   const [dns, setDns] = useState("");
   const [mtu, setMtu] = useState(1420);
+  const [mssClamp, setMssClamp] = useState(1280);
   const [adv, setAdv] = useState(false);
 
   // Initialise form from existing tunnel data
@@ -54,6 +55,7 @@ export function TunnelFormPage() {
     setWgAddress(existing.WgAddress);
     setDns(existing.DNS);
     setMtu(existing.MTU);
+    setMssClamp(existing.MSSClamp || 1280);
   }, [existing]);
 
   // Initialise nodes and strategy from existing node list
@@ -127,6 +129,7 @@ export function TunnelFormPage() {
           wg_address: wgAddress,
           dns,
           mtu,
+          mss_clamp: mssClamp,
           subscription_id: null,
           active_node_id: null,
           vless_uri: vlessUri.trim(),
@@ -139,6 +142,7 @@ export function TunnelFormPage() {
         wg_address: wgAddress,
         dns,
         mtu,
+        mss_clamp: mssClamp,
         subscription_id: subId === "" ? null : Number(subId),
         active_node_id: selectedNodes[0]?.id ?? null,
         node_ids: selectedNodes.map((n) => n.id),
@@ -180,6 +184,7 @@ export function TunnelFormPage() {
         WgAddress: wgAddress,
         DNS: dns,
         MTU: mtu,
+        MSSClamp: mssClamp,
         SubscriptionID: subId === "" ? null : Number(subId),
         ActiveNodeID: selectedNodes[0]?.id ?? existing.ActiveNodeID ?? null,
         BalancingStrategy: strategy,
@@ -292,6 +297,18 @@ export function TunnelFormPage() {
           <div>
             <Label htmlFor="mtu">MTU</Label>
             <Input id="mtu" type="number" value={mtu} onChange={(e) => setMtu(Number(e.target.value))} />
+          </div>
+          <div>
+            <Label htmlFor="mss-clamp">TCP MSS clamp</Label>
+            <Input
+              id="mss-clamp"
+              type="number"
+              value={mssClamp}
+              onChange={(e) => setMssClamp(Number(e.target.value))}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              1280 is safe for Reality / WebSocket / xhttp. Raise to ~1360 for plain TCP if you have headroom.
+            </p>
           </div>
         </div>
       )}

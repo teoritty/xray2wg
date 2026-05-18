@@ -70,6 +70,7 @@ type CreateTunnelInput struct {
 	WgAddress         string
 	DNS               string
 	MTU               int
+	MSSClamp          int
 	SubscriptionID    *int64
 	ActiveNodeID      *int64
 	NodeIDs           []int64
@@ -110,7 +111,7 @@ func (a *TunnelsAPI) CreateTunnel(ctx context.Context, in CreateTunnelInput) (*d
 		listenPort = 51820 + len(list)
 	}
 	strategy := domain.BalancingStrategy(in.BalancingStrategy)
-	return a.Tunnels.Create(ctx, in.Name, listenPort, in.WgAddress, in.DNS, in.MTU, subID, nodeID, nodeIDs, strategy)
+	return a.Tunnels.Create(ctx, in.Name, listenPort, in.WgAddress, in.DNS, in.MTU, in.MSSClamp, subID, nodeID, nodeIDs, strategy)
 }
 
 // GetTunnelNodes returns the ordered list of VLESS nodes for a tunnel with health data.

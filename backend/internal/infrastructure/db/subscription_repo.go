@@ -164,6 +164,71 @@ func (r *SubscriptionRepo) SnapshotActiveNodesForSubscription(ctx context.Contex
 	return out, nil
 }
 
+// SnapshotTunnelNodesForSubscription captures the tunnel_nodes junction rows whose nodes
+// belong to the given subscription, keyed by raw_uri. The snapshot is taken before a refresh
+// wipes vless_nodes (which cascades through DeleteNodes and erases the junction); the matching
+// RestoreTunnelNodesAfterRefresh then re-creates the junction against the new node IDs.
+func (r *SubscriptionRepo) SnapshotTunnelNodesForSubscription(ctx context.Context, subscriptionID int64) ([]domain.TunnelNodeBinding, error) {
+	var rows []struct {
+		WgID     int64  `gorm:"column:wg_id"`
+		RawURI   string `gorm:"column:raw_uri"`
+		Position int    `gorm:"column:position"`
+	}
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT tn.interface_id AS wg_id, n.raw_uri AS raw_uri, tn.position AS position
+		FROM tunnel_nodes tn
+		INNER JOIN vless_nodes n ON n.id = tn.node_id
+		WHERE n.subscription_id = ?
+	`, subscriptionID).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.TunnelNodeBinding, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domain.TunnelNodeBinding{
+			WgInterfaceID: row.WgID,
+			RawURI:        strings.TrimSpace(row.RawURI),
+			Position:      row.Position,
+		})
+	}
+	return out, nil
+}
+
+// RestoreTunnelNodesAfterRefresh re-inserts junction rows resolving raw_uri → new node id.
+// Bindings whose raw_uri no longer appears in the refreshed subscription are dropped silently
+// (the user-visible effect is identical to the node disappearing from the upstream).
+func (r *SubscriptionRepo) RestoreTunnelNodesAfterRefresh(ctx context.Context, subscriptionID int64, bindings []domain.TunnelNodeBinding, newNodes []*domain.VlessNode) error {
+	if len(bindings) == 0 || len(newNodes) == 0 {
+		return nil
+	}
+	firstByURI := make(map[string]int64)
+	for _, n := range newNodes {
+		if n == nil || n.ID == 0 {
+			continue
+		}
+		key := strings.TrimSpace(n.RawURI)
+		if key == "" {
+			continue
+		}
+		if _, ok := firstByURI[key]; !ok {
+			firstByURI[key] = n.ID
+		}
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, b := range bindings {
+			newID := firstByURI[strings.TrimSpace(b.RawURI)]
+			if newID == 0 {
+				continue
+			}
+			row := TunnelNodeRow{InterfaceID: b.WgInterfaceID, NodeID: newID, Position: b.Position}
+			if err := tx.Create(&row).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (r *SubscriptionRepo) RemapActiveNodesAfterRefresh(ctx context.Context, subscriptionID int64, bindings []domain.ActiveNodeBinding, newNodes []*domain.VlessNode) error {
 	if len(bindings) == 0 || len(newNodes) == 0 {
 		return nil

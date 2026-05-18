@@ -28,6 +28,12 @@ func (f *fakeSubRepo) SnapshotActiveNodesForSubscription(context.Context, int64)
 func (f *fakeSubRepo) RemapActiveNodesAfterRefresh(context.Context, int64, []domain.ActiveNodeBinding, []*domain.VlessNode) error {
 	return nil
 }
+func (f *fakeSubRepo) SnapshotTunnelNodesForSubscription(context.Context, int64) ([]domain.TunnelNodeBinding, error) {
+	return nil, nil
+}
+func (f *fakeSubRepo) RestoreTunnelNodesAfterRefresh(context.Context, int64, []domain.TunnelNodeBinding, []*domain.VlessNode) error {
+	return nil
+}
 func (f *fakeSubRepo) InsertNodes(context.Context, []*domain.VlessNode) error { return nil }
 func (f *fakeSubRepo) ListNodes(context.Context, int64) ([]*domain.VlessNode, error) {
 	return nil, nil

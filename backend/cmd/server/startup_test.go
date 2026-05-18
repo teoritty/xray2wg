@@ -82,6 +82,12 @@ func (panicSubRepo) SnapshotActiveNodesForSubscription(ctx context.Context, subs
 func (panicSubRepo) RemapActiveNodesAfterRefresh(ctx context.Context, subscriptionID int64, bindings []domain.ActiveNodeBinding, newNodes []*domain.VlessNode) error {
 	panic("ni")
 }
+func (panicSubRepo) SnapshotTunnelNodesForSubscription(ctx context.Context, subscriptionID int64) ([]domain.TunnelNodeBinding, error) {
+	panic("ni")
+}
+func (panicSubRepo) RestoreTunnelNodesAfterRefresh(ctx context.Context, subscriptionID int64, bindings []domain.TunnelNodeBinding, newNodes []*domain.VlessNode) error {
+	panic("ni")
+}
 func (panicSubRepo) InsertNodes(ctx context.Context, nodes []*domain.VlessNode) error { panic("ni") }
 func (panicSubRepo) ListNodes(ctx context.Context, subscriptionID int64) ([]*domain.VlessNode, error) {
 	panic("ni")

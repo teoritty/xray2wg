@@ -99,7 +99,7 @@ func (t *TunnelService) ReloadNodes(ctx context.Context, id int64) error {
 	return t.Xray.Start(int(id), xrayPort, fwmark, localGW, parsed, strategy)
 }
 
-func (t *TunnelService) Create(ctx context.Context, name string, listen int, wgAddr string, dns string, mtu int,
+func (t *TunnelService) Create(ctx context.Context, name string, listen int, wgAddr string, dns string, mtu int, mssClamp int,
 	subID *int64, nodeID *int64, nodeIDs []int64, strategy domain.BalancingStrategy,
 ) (*domain.WgInterface, error) {
 	priv, pub, err := wgkey.GenerateKeypair()
@@ -113,6 +113,9 @@ func (t *TunnelService) Create(ctx context.Context, name string, listen int, wgA
 	if mtu <= 0 {
 		mtu = 1420
 	}
+	if mssClamp <= 0 {
+		mssClamp = 1280
+	}
 	if strategy == "" {
 		strategy = domain.BalancingRoundRobin
 	}
@@ -124,6 +127,7 @@ func (t *TunnelService) Create(ctx context.Context, name string, listen int, wgA
 		WgAddress:         wgAddr, // filled after ID if empty
 		DNS:               userDNS,
 		MTU:               mtu,
+		MSSClamp:          mssClamp,
 		SubscriptionID:    subID,
 		ActiveNodeID:      nodeID,
 		BalancingStrategy: strategy,
@@ -295,7 +299,7 @@ func (t *TunnelService) Start(ctx context.Context, id int64, peerSvc *PeerServic
 	ctxlog.From(ctx).Info().Int64("tunnel_id", id).Msg("tunnel_trace Start: step xray_embedded ok")
 
 	ctxlog.From(ctx).Info().Int64("tunnel_id", id).Str("tun", tunName).Int("xray_port", xrayPort).Int("fwmark", fwmark).Msg("tunnel_trace Start: step iptables_tproxy")
-	if err := netconf.SetupTProxy(int(id), tunName, xrayPort, fwmark, localGW, representativeFlow); err != nil {
+	if err := netconf.SetupTProxy(int(id), tunName, xrayPort, fwmark, localGW, representativeFlow, iface.MSSClamp); err != nil {
 		ctxlog.From(ctx).Error().Int64("tunnel_id", id).Err(err).Msg("tunnel_trace Start: SetupTProxy failed")
 		_ = t.Xray.Stop(int(id))
 		_ = netconf.TeardownReturnRoute(fwmark, rtbl)
