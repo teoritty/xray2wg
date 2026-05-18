@@ -10,11 +10,14 @@ import (
 const tableNat = "nat"
 
 // SetupNATMasquerade SNATs traffic from the WG client subnet when it leaves via any interface
-// other than the tunnel. Two rules are installed:
-//   - A general rule for TCP/UDP (protocol-unspecified) with the subnet guard.
-//   - An explicit ICMP rule without the interface guard: TPROXY-active kernels sometimes
-//     mis-track ICMP flows that bypass the TPROXY mark path, causing the general rule to miss
-//     them. The dedicated ICMP rule is the fix proposed in github.com/teoritty/xray2wg/issues/2.
+// other than the tunnel itself. One protocol-agnostic rule covers TCP/UDP, ICMP, GRE, ESP and
+// anything else — for TCP/UDP the rule never matches in practice because TPROXY consumes those
+// packets before POSTROUTING; for non-TCP/UDP (ICMP, PMTUD, traceroute) it is the SNAT path
+// that makes ping work out of the WG namespace (issue #2).
+//
+// The rule is inserted at position 1 so it sits above Docker's MASQUERADE rules. With Append,
+// Docker's earlier rules can match first on hosts that publish containers and silently swallow
+// the SNAT decision.
 func SetupNATMasquerade(tunName, clientSubnetCIDR string) error {
 	if clientSubnetCIDR == "" {
 		return nil
@@ -28,20 +31,11 @@ func SetupNATMasquerade(tunName, clientSubnetCIDR string) error {
 	_ = TeardownNATMasquerade(tunName, clientSubnetCIDR)
 
 	rule := []string{"-s", clientSubnetCIDR, "!", "-o", tunName, "-j", "MASQUERADE"}
-	if err := tb.Append(tableNat, "POSTROUTING", rule...); err != nil {
-		log.Error().Err(err).Msg("tunnel_trace nat: POSTROUTING MASQUERADE append failed")
+	if err := tb.Insert(tableNat, "POSTROUTING", 1, rule...); err != nil {
+		log.Error().Err(err).Msg("tunnel_trace nat: POSTROUTING MASQUERADE insert failed")
 		return err
 	}
-	log.Info().Strs("rule", rule).Msg("tunnel_trace nat: MASQUERADE installed for WG subnet egress (not via tun)")
-
-	// Explicit ICMP rule: no interface guard so the masquerade fires even when the kernel's
-	// conntrack does not associate the ICMP flow with the tunnel mark.
-	icmpRule := []string{"-s", clientSubnetCIDR, "-p", "icmp", "-j", "MASQUERADE"}
-	if err := tb.Append(tableNat, "POSTROUTING", icmpRule...); err != nil {
-		log.Error().Err(err).Msg("tunnel_trace nat: POSTROUTING ICMP MASQUERADE append failed")
-		return err
-	}
-	log.Info().Strs("rule", icmpRule).Msg("tunnel_trace nat: ICMP MASQUERADE installed for WG subnet")
+	log.Info().Strs("rule", rule).Msg("tunnel_trace nat: MASQUERADE installed at POSTROUTING pos=1 for WG subnet egress (not via tun)")
 
 	return nil
 }
@@ -55,6 +49,8 @@ func TeardownNATMasquerade(tunName, clientSubnetCIDR string) error {
 		return err
 	}
 	_ = tb.Delete(tableNat, "POSTROUTING", "-s", clientSubnetCIDR, "!", "-o", tunName, "-j", "MASQUERADE")
+	// Older builds installed a dedicated ICMP MASQUERADE rule; delete it best-effort so a
+	// rolling upgrade does not leave a stale rule behind.
 	_ = tb.Delete(tableNat, "POSTROUTING", "-s", clientSubnetCIDR, "-p", "icmp", "-j", "MASQUERADE")
 	return nil
 }

@@ -100,6 +100,16 @@ func SetupTProxy(tunnelID int, tunName string, xrayPort int, fwmark int, localGa
 		log.Error().Err(err).Msg("tunnel_trace tproxy: append UDP failed")
 		return err
 	}
+	// Final RETURN: any packet that reached this point (GRE, ESP, SCTP, IGMP, fragmented
+	// non-TCP/UDP) is not handled by xray-core. Returning explicitly without the TPROXY
+	// mark means the kernel routes it via the normal table; the MASQUERADE rule in
+	// nat_linux.go then SNATs it out via the host's egress interface. See issue #2.
+	final := []string{"-j", "RETURN"}
+	log.Info().Str("chain", chain).Strs("rule_final_return", final).Msg("tunnel_trace tproxy: append final RETURN (non-TCP/UDP fallthrough)")
+	if err := tb.Append(tableMangle, chain, final...); err != nil {
+		log.Error().Err(err).Msg("tunnel_trace tproxy: append final RETURN failed")
+		return err
+	}
 	log.Info().Str("tun", tunName).Str("chain", chain).Msg("tunnel_trace tproxy: jump PREROUTING -> chain")
 	if err := tb.Append(tableMangle, "PREROUTING", "-i", tunName, "-j", chain); err != nil {
 		log.Error().Err(err).Msg("tunnel_trace tproxy: PREROUTING jump failed")
