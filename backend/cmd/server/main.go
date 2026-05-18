@@ -166,6 +166,9 @@ func main() {
 
 	go statsColl.Run(rootCtx)
 
+	nodeHealth := service.NewNodeHealthMonitor(subRepo, 60*time.Second, 3*time.Second, 10)
+	go nodeHealth.Run(rootCtx)
+
 	e := echo.New()
 	e.Pre(echo_mid.RemoveTrailingSlash())
 	deps := apipkg.Deps{
@@ -185,6 +188,7 @@ func main() {
 		ManualSubID: manualID,
 		Static:      staticfs.Assets,
 		Health:      health,
+		NodeHealth:  nodeHealth,
 	}
 	if err := apipkg.Register(e, &deps); err != nil {
 		log.Fatal().Err(err).Msg("register routes")

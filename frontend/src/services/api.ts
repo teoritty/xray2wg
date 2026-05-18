@@ -140,6 +140,7 @@ export type VlessNode = {
   SpiderX: string;
   ALPN: string;
   RawURI: string;
+  Health: NodeHealthInfo;
 };
 
 export type WgInterface = {

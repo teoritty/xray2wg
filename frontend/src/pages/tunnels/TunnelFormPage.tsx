@@ -5,7 +5,7 @@ import { NodeSelector, type SelectedNode } from "../../components/tunnels/NodeSe
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Input, Label, Select } from "../../components/ui/Form";
-import { MANUAL_SUB_NAME, subscriptionsApi, tunnelsApi, type WgInterface } from "../../services/api";
+import { MANUAL_SUB_NAME, subscriptionsApi, tunnelsApi, type NodeHealthInfo, type WgInterface } from "../../services/api";
 
 export function TunnelFormPage() {
   const { id } = useParams();
@@ -90,6 +90,19 @@ export function TunnelFormPage() {
   });
 
   const availableNodes = subId !== "" && !manualMode ? subNodes : allNodes;
+
+  // Build per-position health from the latest background TCP probe of each VLESS node, looked up
+  // by node id from the union of subscription + manual nodes. The probe runs independently of any
+  // tunnel, so this works on both the create and edit forms (issue #6).
+  const nodesHealth = useMemo(() => {
+    if (selectedNodes.length === 0) return undefined;
+    const byId = new Map(availableNodes.map((n) => [n.ID, n.Health] as const));
+    const health: Record<number, NodeHealthInfo> = {};
+    selectedNodes.forEach((sn, i) => {
+      health[i] = byId.get(sn.id) ?? null;
+    });
+    return health;
+  }, [selectedNodes, availableNodes]);
 
   function handleNodeChange(nodeIds: number[], newStrategy: "round_robin" | "least_ping") {
     setStrategy(newStrategy);
@@ -235,6 +248,7 @@ export function TunnelFormPage() {
             selectedNodes={selectedNodes}
             availableNodes={availableNodes}
             strategy={strategy}
+            health={nodesHealth}
             onChange={handleNodeChange}
           />
         </div>

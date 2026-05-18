@@ -35,4 +35,5 @@ type Deps struct {
 	ManualSubID int64
 	Static      fs.FS
 	Health      HealthProbes
+	NodeHealth  *service.NodeHealthMonitor
 }

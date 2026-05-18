@@ -12,7 +12,7 @@ import (
 
 // MountSubscriptions registers /api/v1/subscriptions* (JWT group).
 func MountSubscriptions(api *echo.Group, d *apideps.Deps) {
-	sapi := app.NewSubscriptionsAPI(d.SubRepo, d.Subs)
+	sapi := app.NewSubscriptionsAPI(d.SubRepo, d.Subs, d.NodeHealth)
 
 	api.GET("/subscriptions", func(c echo.Context) error {
 		list, err := sapi.List(c.Request().Context())

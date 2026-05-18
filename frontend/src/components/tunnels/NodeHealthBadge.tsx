@@ -1,7 +1,7 @@
 import type { NodeHealthInfo } from "../../services/api";
 
 type Props = {
-  health: NodeHealthInfo;
+  health: NodeHealthInfo | null;
 };
 
 export function NodeHealthBadge({ health }: Props) {
