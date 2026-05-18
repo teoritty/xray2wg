@@ -7,6 +7,8 @@ import (
 
 	"xray2wg/backend/internal/domain"
 	"xray2wg/backend/internal/tracenv"
+	"xray2wg/backend/internal/vless/security"
+	"xray2wg/backend/internal/vless/transport"
 )
 
 // BuildXrayConfig produces embedded Xray JSON: tproxy dokodemo + VLESS outbound(s).
@@ -92,14 +94,6 @@ func buildInbounds(xrayListenPort, fwmark int, localGatewayIP string) []any {
 }
 
 func buildSingleNodeConfig(node *domain.VlessNode, routeInboundTags []string) (outbounds []any, routing map[string]any) {
-	fp := node.Fingerprint
-	if fp == "" {
-		fp = "chrome"
-	}
-	spider := node.SpiderX
-	if spider == "" {
-		spider = "/"
-	}
 	userObj := map[string]any{"id": node.UUID, "encryption": "none"}
 	if f := strings.TrimSpace(node.Flow); f != "" {
 		userObj["flow"] = f
@@ -116,7 +110,7 @@ func buildSingleNodeConfig(node *domain.VlessNode, routeInboundTags []string) (o
 				},
 			},
 		},
-		"streamSettings": streamSettingsOutbound(node, fp, spider),
+		"streamSettings": streamSettingsOutbound(node),
 	}
 	if strings.TrimSpace(node.Flow) == "" {
 		vlessOut["mux"] = map[string]any{"enabled": true, "concurrency": 8}
@@ -142,14 +136,6 @@ func buildMultiNodeConfig(nodes []*domain.VlessNode, strategy domain.BalancingSt
 	outbounds = []any{map[string]any{"protocol": "freedom", "tag": "direct"}}
 
 	for i, node := range nodes {
-		fp := node.Fingerprint
-		if fp == "" {
-			fp = "chrome"
-		}
-		spider := node.SpiderX
-		if spider == "" {
-			spider = "/"
-		}
 		userObj := map[string]any{"id": node.UUID, "encryption": "none"}
 		if f := strings.TrimSpace(node.Flow); f != "" {
 			userObj["flow"] = f
@@ -167,7 +153,7 @@ func buildMultiNodeConfig(nodes []*domain.VlessNode, strategy domain.BalancingSt
 					},
 				},
 			},
-			"streamSettings": streamSettingsOutbound(node, fp, spider),
+			"streamSettings": streamSettingsOutbound(node),
 		}
 		if strings.TrimSpace(node.Flow) == "" {
 			outEntry["mux"] = map[string]any{"enabled": true, "concurrency": 8}
@@ -219,71 +205,46 @@ func streamSettingsInboundTProxy(_ int) map[string]any {
 	}
 }
 
-func streamSettingsOutbound(node *domain.VlessNode, fp, spider string) map[string]any {
-	net := node.Network
-	if net == "" {
-		net = "tcp"
+// streamSettingsOutbound dispatches through the transport and security registries so that
+// every emitted JSON block is sourced from a single per-transport/per-security
+// implementation. The legacy hard-coded defaults (type=tcp, security=reality) are preserved
+// inside the resolution step; the modern canonical defaults are introduced in a later
+// commit alongside the VlessNode redesign.
+func streamSettingsOutbound(node *domain.VlessNode) map[string]any {
+	netName := node.Network
+	if netName == "" {
+		netName = "tcp"
 	}
-	sec := strings.ToLower(node.Security)
-	if sec == "" {
-		sec = "reality"
+	secName := node.Security
+	if secName == "" {
+		secName = "reality"
 	}
+
+	tr, err := transport.Default.Resolve(netName)
+	if err != nil {
+		// Unknown transport: fall back to plain TCP so xray still receives a valid config
+		// even if a node was created with a transport that has not been registered yet.
+		tr, _ = transport.Default.Resolve("tcp")
+	}
+	tSpec := tr.SpecFromLegacyNode(node)
+	tSettings, _ := tr.EmitSettings(tSpec)
+
+	sec, err := security.Default.Resolve(secName)
+	if err != nil {
+		sec, _ = security.Default.Resolve("none")
+	}
+	sSpec := sec.SpecFromLegacyNode(node)
+	sSettings, _ := sec.EmitSettings(sSpec)
 
 	out := map[string]any{
-		"network": net,
+		"network":  tr.Name(),
+		"security": sec.Name(),
 	}
-	switch strings.ToLower(net) {
-	case "ws", "websocket":
-		path := "/"
-		if node.SpiderX != "" && strings.HasPrefix(node.SpiderX, "/") {
-			path = node.SpiderX
-		}
-		out["network"] = "ws"
-		out["wsSettings"] = map[string]any{
-			"path": path,
-			"headers": map[string]any{
-				"Host": node.SNI,
-			},
-		}
-	case "grpc", "gun":
-		out["network"] = "grpc"
-		svc := node.ALPN
-		if svc == "" {
-			svc = "GunService"
-		}
-		out["grpcSettings"] = map[string]any{"serviceName": svc}
-	default:
-		out["network"] = "tcp"
+	if len(tSettings) > 0 {
+		out[tr.Name()+"Settings"] = tSettings
 	}
-
-	switch sec {
-	case "reality":
-		out["security"] = "reality"
-		out["realitySettings"] = map[string]any{
-			"fingerprint": fp,
-			"serverName":  node.SNI,
-			"publicKey":   node.PublicKey,
-			"shortId":     node.ShortID,
-			"spiderX":     spider,
-		}
-	case "tls":
-		out["security"] = "tls"
-		var alpnVals []any
-		if node.ALPN != "" {
-			for _, p := range strings.Split(node.ALPN, ",") {
-				p = strings.TrimSpace(p)
-				if p != "" {
-					alpnVals = append(alpnVals, p)
-				}
-			}
-		}
-		out["tlsSettings"] = map[string]any{
-			"allowInsecure": false,
-			"serverName":    node.SNI,
-			"alpn":          alpnVals,
-		}
-	default:
-		out["security"] = "none"
+	if len(sSettings) > 0 {
+		out[sec.Name()+"Settings"] = sSettings
 	}
 	return out
 }
